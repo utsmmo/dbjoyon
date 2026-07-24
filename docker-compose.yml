@@ -1,0 +1,82 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: hotel-review-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hotel_review_db
+      POSTGRES_USER: hotel_admin
+      POSTGRES_PASSWORD: hotel_admin_123
+      TZ: Asia/Bangkok
+      PGTZ: Asia/Bangkok
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hotel_admin -d hotel_review_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hotel-review-api
+    restart: unless-stopped
+    environment:
+      APP_ENV: local
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8000
+      DATABASE_URL: postgresql+psycopg://hotel_admin:hotel_admin_123@postgres:5432/hotel_review_db
+      DEFAULT_TIMEZONE: Asia/Bangkok
+      BAD_REVIEW_RATING_THRESHOLD: 9
+      TRANSLATION_PROVIDER: googletrans
+      GOOGLE_TRANSLATE_TARGET_LANGUAGE: vi
+      GOOGLE_TRANSLATE_TIMEOUT_SECONDS: 15
+      GOOGLE_SHEETS_SPREADSHEET_ID: ${GOOGLE_SHEETS_SPREADSHEET_ID:-}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REFRESH_TOKEN: ${GOOGLE_OAUTH_REFRESH_TOKEN:-}
+      BACKUP_ENABLED: "true"
+      BACKUP_LOCAL_DIR: /app/backups
+      BACKUP_DRIVE_REMOTE: ${BACKUP_DRIVE_REMOTE:-}
+      BACKUP_DRIVE_ROOT_FOLDER: ${BACKUP_DRIVE_ROOT_FOLDER:-hotel-review-backup}
+      BACKUP_DRIVE_DAILY_SUBFOLDERS: ${BACKUP_DRIVE_DAILY_SUBFOLDERS:-true}
+      BACKUP_KEEP_LOCAL_DAYS: ${BACKUP_KEEP_LOCAL_DAYS:-14}
+      BACKUP_DB_HOST: postgres
+      BACKUP_DB_PORT: 5432
+      BACKUP_DB_NAME: hotel_review_db
+      BACKUP_DB_USER: hotel_admin
+      BACKUP_DB_PASSWORD: hotel_admin_123
+      BACKUP_RCLONE_CONFIG_PATH: /root/.config/rclone/rclone.conf
+    ports:
+      - "13000:8000"
+    volumes:
+      - ./backups:/app/backups
+      - ${RCLONE_CONFIG_HOST_PATH:-./ops/backup/rclone}:/root/.config/rclone:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  pgadmin:
+    image: dpage/pgadmin4:9
+    container_name: hotel-review-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@datac.click
+      PGADMIN_DEFAULT_PASSWORD: admin_123
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
+      PGADMIN_CONFIG_LOGIN_BANNER: "'Internal admin panel for hotel review platform'"
+    ports:
+      - "5050:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
