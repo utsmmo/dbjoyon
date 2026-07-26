@@ -1,0 +1,15 @@
+{
+  "name": "web-hotel-review",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "frontend-web",
+    "backend-api"
+  ],
+  "scripts": {
+    "dev:frontend": "cd frontend-web && pnpm dev",
+    "dev:backend": "cd backend-api && pnpm start:dev",
+    "build:frontend": "cd frontend-web && pnpm build",
+    "build:backend": "cd backend-api && pnpm build"
+  }
+}

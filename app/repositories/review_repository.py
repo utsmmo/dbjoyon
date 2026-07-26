@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import text
@@ -120,11 +121,26 @@ class ReviewRepository:
         hotel_id: str | None,
         platform_code: str | None,
         is_bad_review: bool | None,
+        reviewer_country_code: str | None,
+        rating_min: float | None,
+        rating_max: float | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        q: str | None,
+        sort_by: str,
+        sort_order: str,
         limit: int,
         offset: int,
     ) -> tuple[list[dict[str, Any]], int]:
         filters = ["1 = 1"]
         params: dict[str, Any] = {"limit": limit, "offset": offset}
+        sort_expression_map = {
+            "reviewed_at": "r.reviewed_at",
+            "rating": "r.rating",
+            "created_at": "r.created_at",
+            "hotel_name": "h.hotel_name",
+            "reviewer_name": "r.reviewer_name",
+        }
 
         if hotel_id:
             filters.append("r.hotel_id = CAST(:hotel_id AS uuid)")
@@ -135,8 +151,39 @@ class ReviewRepository:
         if is_bad_review is not None:
             filters.append("r.is_bad_review = :is_bad_review")
             params["is_bad_review"] = is_bad_review
+        if reviewer_country_code:
+            filters.append("r.reviewer_country_code = UPPER(:reviewer_country_code)")
+            params["reviewer_country_code"] = reviewer_country_code
+        if rating_min is not None:
+            filters.append("r.rating >= :rating_min")
+            params["rating_min"] = rating_min
+        if rating_max is not None:
+            filters.append("r.rating <= :rating_max")
+            params["rating_max"] = rating_max
+        if date_from is not None:
+            filters.append("r.reviewed_at >= :date_from")
+            params["date_from"] = date_from
+        if date_to is not None:
+            filters.append("r.reviewed_at <= :date_to")
+            params["date_to"] = date_to
+        if q:
+            filters.append(
+                """
+                (
+                    COALESCE(r.review_title, '') ILIKE :q
+                    OR COALESCE(r.review_text, '') ILIKE :q
+                    OR COALESCE(r.normalized_payload ->> 'translated_title_vi', '') ILIKE :q
+                    OR COALESCE(r.normalized_payload ->> 'translated_text_vi', '') ILIKE :q
+                    OR COALESCE(r.reviewer_name, '') ILIKE :q
+                    OR COALESCE(h.hotel_name, '') ILIKE :q
+                )
+                """
+            )
+            params["q"] = f"%{q.strip()}%"
 
         where_clause = " AND ".join(filters)
+        sort_expression = sort_expression_map[sort_by]
+        sort_order_sql = "ASC" if sort_order.lower() == "asc" else "DESC"
 
         query = text(
             f"""
@@ -168,7 +215,7 @@ class ReviewRepository:
             JOIN hotels h ON h.id = r.hotel_id
             JOIN platforms p ON p.id = r.platform_id
             WHERE {where_clause}
-            ORDER BY r.reviewed_at DESC, r.created_at DESC
+            ORDER BY {sort_expression} {sort_order_sql} NULLS LAST, r.created_at DESC
             LIMIT :limit OFFSET :offset
             """
         )

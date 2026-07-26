@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  passwordHash String
+  fullName     String
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  userRoles    UserRole[]
+  auditLogs    AuditLog[]
+}
+
+model Role {
+  id              String           @id @default(cuid())
+  code            String           @unique
+  name            String
+  description     String?
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+}
+
+model Permission {
+  id              String           @id @default(cuid())
+  code            String           @unique
+  name            String
+  description     String?
+  rolePermissions RolePermission[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model Country {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  hotels    Hotel[]
+  reviews   Review[]
+  createdAt DateTime @default(now())
+}
+
+model ReviewSource {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  reviews   Review[]
+  createdAt DateTime @default(now())
+}
+
+model Hotel {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  countryId   String
+  city        String?
+  address     String?
+  starRating  Int?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  country     Country  @relation(fields: [countryId], references: [id])
+  reviews     Review[]
+}
+
+model Review {
+  id                String       @id @default(cuid())
+  hotelId           String
+  countryId         String
+  sourceId          String?
+  reviewerName      String?
+  title             String?
+  content           String
+  rating            Float
+  reviewDate        DateTime
+  sentimentLabel    String?
+  sentimentScore    Float?
+  detectedLanguage  String?
+  aiSummary         String?
+  aiKeywords        Json?
+  analysisVersion   String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  hotel             Hotel        @relation(fields: [hotelId], references: [id])
+  country           Country      @relation(fields: [countryId], references: [id])
+  source            ReviewSource? @relation(fields: [sourceId], references: [id])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String?
+  detail     Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}

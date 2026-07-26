@@ -1,0 +1,11 @@
+node_modules
+.next
+dist
+.env
+.env.local
+coverage
+*.log
+frontend-web/node_modules
+backend-api/node_modules
+frontend-web/.next
+backend-api/dist

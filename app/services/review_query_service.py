@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -20,13 +22,37 @@ class ReviewQueryService:
         hotel_id: str | None,
         platform_code: str | None,
         is_bad_review: bool | None,
+        reviewer_country_code: str | None,
+        rating_min: float | None,
+        rating_max: float | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        q: str | None,
+        sort_by: str,
+        sort_order: str,
         limit: int,
         offset: int,
     ) -> ReviewListResponse:
+        self._validate_review_filters(
+            rating_min=rating_min,
+            rating_max=rating_max,
+            date_from=date_from,
+            date_to=date_to,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        )
         items, total = self.review_repository.list_reviews(
             hotel_id=hotel_id,
             platform_code=platform_code,
             is_bad_review=is_bad_review,
+            reviewer_country_code=reviewer_country_code,
+            rating_min=rating_min,
+            rating_max=rating_max,
+            date_from=date_from,
+            date_to=date_to,
+            q=q,
+            sort_by=sort_by,
+            sort_order=sort_order,
             limit=limit,
             offset=offset,
         )
@@ -131,3 +157,27 @@ class ReviewQueryService:
             and (review_language == "vi" or translated_text != text)
         )
         return title_ok and text_ok
+
+    @staticmethod
+    def _validate_review_filters(
+        *,
+        rating_min: float | None,
+        rating_max: float | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        sort_by: str,
+        sort_order: str,
+    ) -> None:
+        allowed_sort_by = {"reviewed_at", "rating", "created_at", "hotel_name", "reviewer_name"}
+        allowed_sort_order = {"asc", "desc"}
+
+        if rating_min is not None and rating_max is not None and rating_min > rating_max:
+            raise ValueError("rating_min must be less than or equal to rating_max")
+        if date_from is not None and date_to is not None and date_from > date_to:
+            raise ValueError("date_from must be less than or equal to date_to")
+        if sort_by not in allowed_sort_by:
+            raise ValueError(
+                "sort_by must be one of: reviewed_at, rating, created_at, hotel_name, reviewer_name"
+            )
+        if sort_order.lower() not in allowed_sort_order:
+            raise ValueError("sort_order must be either 'asc' or 'desc'")

@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: hotel-review-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hotel_review_db
+      POSTGRES_USER: hotel_admin
+      POSTGRES_PASSWORD: hotel_admin_123
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend-api:
+    build:
+      context: ./backend-api
+    environment:
+      PORT: 3001
+      FRONTEND_URL: http://localhost:3000
+      DATABASE_URL: postgresql://hotel_admin:hotel_admin_123@postgres:5432/hotel_review_db
+      DATA_SOURCE_MODE: demo
+      AI_PROVIDER: mock
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+
+  frontend-web:
+    build:
+      context: ./frontend-web
+    environment:
+      NEXT_PUBLIC_BASE_PATH: /review
+      NEXT_PUBLIC_API_BASE_URL: http://backend-api:3001/api
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend-api
+
+volumes:
+  postgres_data:
