@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerApiBaseUrl } from "@/lib/server-api";
 
-const API_BASE_URL = "https://data.datac.click";
+const API_BASE_URL = getServerApiBaseUrl();
 const REVIEWS_CACHE_TTL_MS = 30_000;
 const REVIEWS_FETCH_TIMEOUT_MS = 15_000;
 

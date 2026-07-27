@@ -7,7 +7,7 @@ RUN npm install
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-ARG NEXT_PUBLIC_BASE_PATH=/review
+ARG NEXT_PUBLIC_BASE_PATH=""
 ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -19,7 +19,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-ARG NEXT_PUBLIC_BASE_PATH=/review
+ARG NEXT_PUBLIC_BASE_PATH=""
 ENV NEXT_PUBLIC_BASE_PATH=${NEXT_PUBLIC_BASE_PATH}
 
 COPY --from=builder /app/.next ./.next

@@ -18,7 +18,7 @@ services:
       dockerfile: Dockerfile
     environment:
       PORT: 3001
-      FRONTEND_URL: http://localhost:3000
+      FRONTEND_URL: http://joyon.asia,https://joyon.asia,http://www.joyon.asia,https://www.joyon.asia
       DATABASE_URL: postgresql://hotel_admin:hotel_admin_123@postgres:5432/hotel_review_db
       DATA_SOURCE_MODE: demo
       AI_PROVIDER: mock
@@ -32,11 +32,12 @@ services:
       context: ./frontend-web
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_BASE_PATH: /review
+        NEXT_PUBLIC_BASE_PATH: ""
     environment:
       PORT: 3000
-      NEXT_PUBLIC_BASE_PATH: /review
-      NEXT_PUBLIC_API_BASE_URL: http://backend-api:3001/api
+      NEXT_PUBLIC_BASE_PATH: ""
+      NEXT_PUBLIC_API_BASE_URL: https://data.datac.click/api
+      INTERNAL_API_BASE_URL: https://data.datac.click/api
     ports:
       - "3000:3000"
     depends_on:

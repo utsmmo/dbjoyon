@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const REVIEW_AI_BASE_URL =
   process.env.REVIEW_AI_BASE_URL || "https://r7dnyxy.abc-tunnel.us/v1";
-const REVIEW_AI_API_KEY =
-  process.env.REVIEW_AI_API_KEY || "sk-51c6e48e4c4ececa-d4mh3m-307caa8c";
+const REVIEW_AI_API_KEY = process.env.REVIEW_AI_API_KEY || "";
 const REVIEW_AI_MODEL =
   process.env.REVIEW_AI_MODEL || "cx/gpt-5.4-mini-review";
 const REVIEW_AI_TIMEOUT_MS = 45_000;

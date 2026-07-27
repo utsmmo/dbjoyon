@@ -202,12 +202,12 @@ export function WorkspaceShell({
           <Link href="/" className="rounded-[14px] border border-slate-200 bg-white px-5 py-5 transition hover:border-slate-300 hover:bg-slate-50">
             <div className="flex items-center gap-3">
               <div className="flex h-14 w-14 items-center justify-center rounded-[14px] bg-slate-900 text-[22px] font-bold text-white">
-                H
+                J
               </div>
               <div>
-                <p className="text-[13px] font-semibold text-[#667085]">Internal platform</p>
+                <p className="text-[13px] font-semibold text-[#667085]">JoyON hospitality</p>
                 <h1 className="mt-1 font-display text-[28px] font-semibold leading-[0.98] text-[#111827]">
-                  Hotel Workspace
+                  JoyON Workspace
                 </h1>
               </div>
             </div>
@@ -300,6 +300,17 @@ export function WorkspaceShell({
               </div>
               {showHeaderActions ? (
                 <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new Event("joyon-logout"));
+                      }
+                    }}
+                    className="rounded-[12px] border border-slate-200 bg-white px-4 py-2.5 text-[14px] font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Logout
+                  </button>
                   <div className="hidden h-11 w-11 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-500 md:flex">
                     <svg viewBox="0 0 20 20" fill="none" className="h-5 w-5" aria-hidden="true">
                       <path d="M5 7.5h10M5 11h10M5 14.5h6.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />

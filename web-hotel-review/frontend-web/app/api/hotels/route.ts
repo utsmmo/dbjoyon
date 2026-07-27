@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerApiBaseUrl } from "@/lib/server-api";
 
-const API_BASE_URL = "https://data.datac.click";
+const API_BASE_URL = getServerApiBaseUrl();
 
 export async function GET(request: NextRequest) {
   const url = new URL("/api/v1/hotels", API_BASE_URL);

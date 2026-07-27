@@ -1,0 +1,9 @@
+tunnel: YOUR_TUNNEL_ID
+credentials-file: C:\Users\YOUR_USER\.cloudflared\YOUR_TUNNEL_ID.json
+
+ingress:
+  - hostname: joyon.asia
+    service: http://localhost:9979
+  - hostname: www.joyon.asia
+    service: http://localhost:9979
+  - service: http_status:404
