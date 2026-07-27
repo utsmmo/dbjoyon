@@ -11,6 +11,73 @@ class ReviewRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    @staticmethod
+    def _build_review_query_parts(
+        *,
+        hotel_id: str | None,
+        platform_code: str | None,
+        is_bad_review: bool | None,
+        reviewer_country_code: str | None,
+        rating_min: float | None,
+        rating_max: float | None,
+        date_from: datetime | None,
+        date_to: datetime | None,
+        q: str | None,
+        sort_by: str,
+    ) -> tuple[str, str, dict[str, Any]]:
+        filters = ["1 = 1"]
+        params: dict[str, Any] = {}
+        joins: list[str] = []
+
+        needs_hotel_join = sort_by == "hotel_name" or bool(q)
+        needs_platform_join = bool(platform_code)
+
+        if needs_hotel_join:
+            joins.append("JOIN hotels h ON h.id = r.hotel_id")
+        if needs_platform_join:
+            joins.append("JOIN platforms p ON p.id = r.platform_id")
+
+        if hotel_id:
+            filters.append("r.hotel_id = CAST(:hotel_id AS uuid)")
+            params["hotel_id"] = hotel_id
+        if platform_code:
+            filters.append("p.platform_code = :platform_code")
+            params["platform_code"] = platform_code
+        if is_bad_review is not None:
+            filters.append("r.is_bad_review = :is_bad_review")
+            params["is_bad_review"] = is_bad_review
+        if reviewer_country_code:
+            filters.append("r.reviewer_country_code = UPPER(:reviewer_country_code)")
+            params["reviewer_country_code"] = reviewer_country_code
+        if rating_min is not None:
+            filters.append("r.rating >= :rating_min")
+            params["rating_min"] = rating_min
+        if rating_max is not None:
+            filters.append("r.rating <= :rating_max")
+            params["rating_max"] = rating_max
+        if date_from is not None:
+            filters.append("r.reviewed_at >= :date_from")
+            params["date_from"] = date_from
+        if date_to is not None:
+            filters.append("r.reviewed_at <= :date_to")
+            params["date_to"] = date_to
+        if q:
+            filters.append(
+                """
+                (
+                    COALESCE(r.review_title, '') ILIKE :q
+                    OR COALESCE(r.review_text, '') ILIKE :q
+                    OR COALESCE(r.normalized_payload ->> 'translated_title_vi', '') ILIKE :q
+                    OR COALESCE(r.normalized_payload ->> 'translated_text_vi', '') ILIKE :q
+                    OR COALESCE(r.reviewer_name, '') ILIKE :q
+                    OR COALESCE(h.hotel_name, '') ILIKE :q
+                )
+                """
+            )
+            params["q"] = f"%{q.strip()}%"
+
+        return " ".join(joins), " AND ".join(filters), params
+
     def upsert_review(
         self,
         *,
@@ -132,7 +199,6 @@ class ReviewRepository:
         limit: int,
         offset: int,
     ) -> tuple[list[dict[str, Any]], int]:
-        filters = ["1 = 1"]
         params: dict[str, Any] = {"limit": limit, "offset": offset}
         sort_expression_map = {
             "reviewed_at": "r.reviewed_at",
@@ -141,52 +207,44 @@ class ReviewRepository:
             "hotel_name": "h.hotel_name",
             "reviewer_name": "r.reviewer_name",
         }
-
-        if hotel_id:
-            filters.append("r.hotel_id = CAST(:hotel_id AS uuid)")
-            params["hotel_id"] = hotel_id
-        if platform_code:
-            filters.append("p.platform_code = :platform_code")
-            params["platform_code"] = platform_code
-        if is_bad_review is not None:
-            filters.append("r.is_bad_review = :is_bad_review")
-            params["is_bad_review"] = is_bad_review
-        if reviewer_country_code:
-            filters.append("r.reviewer_country_code = UPPER(:reviewer_country_code)")
-            params["reviewer_country_code"] = reviewer_country_code
-        if rating_min is not None:
-            filters.append("r.rating >= :rating_min")
-            params["rating_min"] = rating_min
-        if rating_max is not None:
-            filters.append("r.rating <= :rating_max")
-            params["rating_max"] = rating_max
-        if date_from is not None:
-            filters.append("r.reviewed_at >= :date_from")
-            params["date_from"] = date_from
-        if date_to is not None:
-            filters.append("r.reviewed_at <= :date_to")
-            params["date_to"] = date_to
-        if q:
-            filters.append(
-                """
-                (
-                    COALESCE(r.review_title, '') ILIKE :q
-                    OR COALESCE(r.review_text, '') ILIKE :q
-                    OR COALESCE(r.normalized_payload ->> 'translated_title_vi', '') ILIKE :q
-                    OR COALESCE(r.normalized_payload ->> 'translated_text_vi', '') ILIKE :q
-                    OR COALESCE(r.reviewer_name, '') ILIKE :q
-                    OR COALESCE(h.hotel_name, '') ILIKE :q
-                )
-                """
-            )
-            params["q"] = f"%{q.strip()}%"
-
-        where_clause = " AND ".join(filters)
+        join_clause, where_clause, filter_params = self._build_review_query_parts(
+            hotel_id=hotel_id,
+            platform_code=platform_code,
+            is_bad_review=is_bad_review,
+            reviewer_country_code=reviewer_country_code,
+            rating_min=rating_min,
+            rating_max=rating_max,
+            date_from=date_from,
+            date_to=date_to,
+            q=q,
+            sort_by=sort_by,
+        )
+        params.update(filter_params)
         sort_expression = sort_expression_map[sort_by]
         sort_order_sql = "ASC" if sort_order.lower() == "asc" else "DESC"
 
+        count_query = text(
+            f"""
+            SELECT COUNT(*)::int
+            FROM reviews r
+            {join_clause}
+            WHERE {where_clause}
+            """
+        )
+        total = int(self.db.execute(count_query, params).scalar_one())
+        if total == 0:
+            return [], 0
+
         query = text(
             f"""
+            WITH page_ids AS (
+                SELECT r.id
+                FROM reviews r
+                {join_clause}
+                WHERE {where_clause}
+                ORDER BY {sort_expression} {sort_order_sql} NULLS LAST, r.created_at DESC, r.id DESC
+                LIMIT :limit OFFSET :offset
+            )
             SELECT
                 r.id::text AS id,
                 r.hotel_id::text AS hotel_id,
@@ -209,20 +267,16 @@ class ReviewRepository:
                 r.replied_at,
                 r.source_updated_at,
                 r.created_at,
-                r.updated_at,
-                COUNT(*) OVER() AS total_count
-            FROM reviews r
+                r.updated_at
+            FROM page_ids pid
+            JOIN reviews r ON r.id = pid.id
             JOIN hotels h ON h.id = r.hotel_id
             JOIN platforms p ON p.id = r.platform_id
-            WHERE {where_clause}
-            ORDER BY {sort_expression} {sort_order_sql} NULLS LAST, r.created_at DESC
-            LIMIT :limit OFFSET :offset
+            ORDER BY {sort_expression} {sort_order_sql} NULLS LAST, r.created_at DESC, r.id DESC
             """
         )
         rows = self.db.execute(query, params).mappings().all()
-        total = int(rows[0]["total_count"]) if rows else 0
-        items = [{k: v for k, v in row.items() if k != "total_count"} for row in rows]
-        return items, total
+        return [dict(row) for row in rows], total
 
     def count_reviews(
         self,

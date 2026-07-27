@@ -128,3 +128,40 @@ export type DashboardAnalyticsResponse = {
   supports_full_analytics: boolean;
   unsupported_filters: string[];
 };
+
+export type ReviewCategoryItem = {
+  category_code: string | null;
+  category_name: string;
+  score: number | null;
+  score_scale: number | null;
+  display_order?: number | null;
+  metadata?: Record<string, unknown>;
+};
+
+export type ReviewCategoryRawItem = {
+  id?: string;
+  name?: string;
+  score?: number | null;
+  raw_score?: number | null;
+  score_scale?: number | null;
+};
+
+export type ReviewCategoryCurrentSummary = {
+  hotel_id: string;
+  hotel_name: string;
+  platform_code: string;
+  source_captured_at: string;
+  categories: ReviewCategoryItem[];
+  raw_payload?: {
+    items?: ReviewCategoryRawItem[];
+    categories_title?: string;
+    provider?: string;
+    [key: string]: unknown;
+  };
+  metadata?: Record<string, unknown>;
+};
+
+export type ReviewCategoryCurrentListResponse = {
+  items: ReviewCategoryCurrentSummary[];
+  total: number;
+};

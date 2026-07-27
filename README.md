@@ -449,6 +449,7 @@ File huong dan va mau config da co san:
 - [docs/DASHBOARD_ANALYTICS_ARCHITECTURE.md](D:/AutoCode/DB/Review/docs/DASHBOARD_ANALYTICS_ARCHITECTURE.md)
 - [docs/BACKEND_ANALYTICS_TASK.md](D:/AutoCode/DB/Review/docs/BACKEND_ANALYTICS_TASK.md)
 - [docs/ANALYTICS_BACKFILL_RUNBOOK.md](D:/AutoCode/DB/Review/docs/ANALYTICS_BACKFILL_RUNBOOK.md)
+- [docs/REVIEW_CATEGORIES_GUIDE.md](D:/AutoCode/DB/Review/docs/REVIEW_CATEGORIES_GUIDE.md)
 
 Flow nhanh:
 

@@ -25,6 +25,7 @@ def list_reviews(
     sort_order: str = Query(default="desc"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    hydrate_missing_translations: bool = Query(default=False),
     db: Session = Depends(db_session),
 ) -> ReviewListResponse:
     service = ReviewQueryService(db)
@@ -43,6 +44,7 @@ def list_reviews(
             sort_order=sort_order,
             limit=limit,
             offset=offset,
+            hydrate_missing_translations=hydrate_missing_translations,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -62,6 +64,7 @@ def list_bad_reviews(
     sort_order: str = Query(default="desc"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    hydrate_missing_translations: bool = Query(default=False),
     db: Session = Depends(db_session),
 ) -> ReviewListResponse:
     service = ReviewQueryService(db)
@@ -80,6 +83,7 @@ def list_bad_reviews(
             sort_order=sort_order,
             limit=limit,
             offset=offset,
+            hydrate_missing_translations=hydrate_missing_translations,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

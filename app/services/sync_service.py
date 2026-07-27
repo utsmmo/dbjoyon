@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.repositories.incident_repository import IncidentRepository
+from app.repositories.review_category_repository import ReviewCategoryRepository
 from app.repositories.platform_repository import PlatformRepository
 from app.repositories.review_metric_repository import ReviewMetricRepository
 from app.repositories.review_repository import ReviewRepository
@@ -17,6 +18,7 @@ class ReviewSyncService:
         self.sync_job_repository = SyncJobRepository(db)
         self.review_repository = ReviewRepository(db)
         self.review_metric_repository = ReviewMetricRepository(db)
+        self.review_category_repository = ReviewCategoryRepository(db)
         self.incident_repository = IncidentRepository(db)
         self.translation_service = TranslationService()
 
@@ -69,6 +71,22 @@ class ReviewSyncService:
                     if payload.source_captured_at
                     else None,
                     raw_payload=payload.source_metrics_payload,
+                    metadata={"triggered_by": payload.triggered_by},
+                )
+
+            if payload.source_categories or payload.source_category_payload:
+                self.review_category_repository.upsert_category_snapshot(
+                    hotel_id=payload.hotel_id,
+                    platform_id=platform["id"],
+                    hotel_platform_account_id=payload.hotel_platform_account_id,
+                    source_captured_at=payload.source_captured_at.isoformat()
+                    if payload.source_captured_at
+                    else None,
+                    categories_payload=[
+                        item.model_dump(mode="json")
+                        for item in payload.source_categories
+                    ],
+                    raw_payload=payload.source_category_payload,
                     metadata={"triggered_by": payload.triggered_by},
                 )
 

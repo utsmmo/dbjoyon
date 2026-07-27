@@ -18,11 +18,12 @@ import {
   DashboardFilters,
   Hotel,
   PaginatedResponse,
+  ReviewCategoryCurrentListResponse,
+  ReviewCategoryCurrentSummary,
   Review,
 } from "@/lib/types";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
-const SERVER_PAGE_LIMIT = 200;
 const CLIENT_PAGE_SIZE = 12;
 const CLIENT_CACHE_TTL_MS = 60_000;
 
@@ -35,6 +36,41 @@ type BarDatum = {
   label: string;
   value: number;
 };
+
+type CategoryDatum = {
+  code: string;
+  label: string;
+  value: number;
+  scale: number;
+};
+
+function normalizeCategorySummary(
+  summary: ReviewCategoryCurrentSummary,
+): ReviewCategoryCurrentSummary {
+  const normalizedCategories = Array.isArray(summary.categories) ? summary.categories : [];
+  const fallbackItems = Array.isArray(summary.raw_payload?.items)
+    ? summary.raw_payload.items
+    : [];
+
+  if (normalizedCategories.length > 0 || fallbackItems.length === 0) {
+    return {
+      ...summary,
+      categories: normalizedCategories,
+    };
+  }
+
+  return {
+    ...summary,
+    categories: fallbackItems
+      .filter((item) => typeof item.score === "number" && item.name)
+      .map((item, index) => ({
+        category_code: item.id || `raw_category_${index + 1}`,
+        category_name: item.name || `Category ${index + 1}`,
+        score: item.score ?? null,
+        score_scale: item.score_scale ?? 10,
+      })),
+  };
+}
 
 type TableScoreFilter = "good" | "average" | "bad" | "unrated";
 type ReviewFlagFilter = TableScoreFilter;
@@ -181,53 +217,17 @@ async function fetchHotels() {
   return (await response.json()) as PaginatedResponse<Hotel>;
 }
 
-async function fetchReviewPage(filters: DashboardFilters) {
+async function fetchReviewPage(filters: DashboardFilters, page = 1, limit = CLIENT_PAGE_SIZE) {
   const params = buildReviewQuery(filters);
-  params.set("limit", String(SERVER_PAGE_LIMIT));
-  params.set("offset", "0");
+  params.set("limit", String(limit));
+  params.set("offset", String(Math.max(page - 1, 0) * limit));
 
-  const firstResponse = await fetch(buildLocalUrl(`/api/reviews?${params.toString()}`), {
+  const response = await fetch(buildLocalUrl(`/api/reviews?${params.toString()}`), {
     cache: "no-store",
     signal: AbortSignal.timeout(25_000),
   });
-  if (!firstResponse.ok) throw new Error((await firstResponse.text()) || "Failed to load reviews.");
-
-  const firstPage = (await firstResponse.json()) as PaginatedResponse<Review>;
-  const items = [...firstPage.items];
-
-  if (firstPage.total <= items.length) {
-    return firstPage;
-  }
-
-  const offsets: number[] = [];
-  for (let offset = items.length; offset < firstPage.total; offset += SERVER_PAGE_LIMIT) {
-    offsets.push(offset);
-  }
-
-  const responses = await Promise.all(
-    offsets.map(async (offset) => {
-      const nextParams = buildReviewQuery(filters);
-      nextParams.set("limit", String(SERVER_PAGE_LIMIT));
-      nextParams.set("offset", String(offset));
-      const response = await fetch(buildLocalUrl(`/api/reviews?${nextParams.toString()}`), {
-        cache: "no-store",
-        signal: AbortSignal.timeout(25_000),
-      });
-      if (!response.ok) {
-        throw new Error((await response.text()) || "Failed to load paginated reviews.");
-      }
-      return (await response.json()) as PaginatedResponse<Review>;
-    }),
-  );
-
-  responses.forEach((page) => {
-    items.push(...page.items);
-  });
-
-  return {
-    ...firstPage,
-    items,
-  };
+  if (!response.ok) throw new Error((await response.text()) || "Failed to load reviews.");
+  return (await response.json()) as PaginatedResponse<Review>;
 }
 
 async function fetchReviewAnalytics(filters: DashboardFilters) {
@@ -242,6 +242,89 @@ async function fetchReviewAnalytics(filters: DashboardFilters) {
   }
 
   return (await response.json()) as DashboardAnalyticsResponse;
+}
+
+async function fetchReviewCategoriesCurrent(filters: {
+  hotelId?: string;
+  platformCode?: string;
+}) {
+  async function requestCategorySummary(query: { hotelId?: string; platformCode?: string }) {
+    const params = new URLSearchParams();
+    if (query.hotelId) {
+      params.set("hotel_id", query.hotelId);
+    }
+    if (query.platformCode) {
+      params.set("platform_code", query.platformCode);
+    }
+
+    const suffix = params.toString();
+    const response = await fetch(
+      buildLocalUrl(`/api/review-categories/current${suffix ? `?${suffix}` : ""}`),
+      {
+        cache: "no-store",
+        signal: AbortSignal.timeout(20_000),
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error((await response.text()) || "Failed to load review categories.");
+    }
+
+    const payload = (await response.json()) as ReviewCategoryCurrentListResponse;
+    return {
+      ...payload,
+      items: payload.items.map(normalizeCategorySummary),
+    } satisfies ReviewCategoryCurrentListResponse;
+  }
+
+  const exact = await requestCategorySummary(filters);
+  if (exact.items.length > 0) {
+    return exact;
+  }
+
+  if (!filters.hotelId && filters.platformCode) {
+    return requestCategorySummary({ platformCode: filters.platformCode });
+  }
+
+  return exact;
+}
+
+async function fetchReviewInsights(payload: {
+  totalMatches: number;
+  visibleReviewCount: number;
+  filters: Record<string, string | string[] | boolean | null | undefined>;
+  analyticsSummary?: Record<string, unknown> | null;
+  countryBreakdown?: Array<{ label: string; value: number }>;
+  hotelBreakdown?: Array<{ label: string; value: number }>;
+  keywordSummary?: Array<{ label: string; value: number }>;
+  categories?: CategoryDatum[];
+  reviews: Array<{
+    hotel_name: string;
+    platform_code: string | null;
+    reviewer_country_code: string | null;
+    rating: number | null;
+    rating_scale: number | null;
+    reviewed_at: string;
+    is_bad_review: boolean;
+    title: string;
+    body: string;
+  }>;
+}) {
+  const response = await fetch(buildLocalUrl("/api/review-insights"), {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(50_000),
+  });
+
+  if (!response.ok) {
+    throw new Error((await response.text()) || "Failed to generate AI insights.");
+  }
+
+  return (await response.json()) as { content: string };
 }
 
 function FilterField({
@@ -313,9 +396,8 @@ function DateTextControl({
         type="date"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="pointer-events-none absolute bottom-0 left-0 h-0 w-0 opacity-0"
-        tabIndex={-1}
-        aria-hidden="true"
+        className="absolute inset-0 cursor-pointer opacity-0"
+        aria-label={placeholder}
       />
       <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400">
         <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
@@ -815,6 +897,31 @@ function ExpandableBars({
   );
 }
 
+function CategoryBars({ items }: { items: CategoryDatum[] }) {
+  const maxRatio = Math.max(...items.map((item) => item.value / Math.max(item.scale, 1)), 0.1);
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {items.map((item) => (
+        <div key={item.code} className="rounded-[18px] border border-slate-100 bg-white px-4 py-4 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[14px] font-semibold text-[#1F2937]">{item.label}</p>
+            <p className="text-[15px] font-semibold text-slate-900">
+              {item.value.toFixed(1)}
+            </p>
+          </div>
+          <div className="mt-3 h-2.5 rounded-full bg-slate-100">
+            <div
+              className="h-2.5 rounded-full bg-blue-700"
+              style={{ width: `${Math.max(((item.value / Math.max(item.scale, 1)) / maxRatio) * 100, 10)}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EmptyState({ label }: { label: string }) {
   return (
     <div className="rounded-[14px] border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-[14px] leading-7 text-[#52627A]">
@@ -969,6 +1076,7 @@ export function ReviewDashboard({
   const [platformFilterOptions, setPlatformFilterOptions] = useState<{ label: string; value: string }[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [analytics, setAnalytics] = useState<DashboardAnalyticsResponse | null>(null);
+  const [reviewCategories, setReviewCategories] = useState<ReviewCategoryCurrentSummary[]>([]);
   const [totalMatches, setTotalMatches] = useState(0);
   const [draftFilters, setDraftFilters] = useState<DashboardFilters>(DEFAULT_FILTERS);
   const [filters, setFilters] = useState<DashboardFilters>(DEFAULT_FILTERS);
@@ -980,10 +1088,26 @@ export function ReviewDashboard({
   const [tableScoreFilters, setTableScoreFilters] = useState<TableScoreFilter[]>([]);
   const [tableLanguageFilters, setTableLanguageFilters] = useState<string[]>([]);
   const [dashboardInsightsRequested, setDashboardInsightsRequested] = useState(false);
+  const [aiInsightContent, setAiInsightContent] = useState("");
+  const [aiInsightError, setAiInsightError] = useState<string | null>(null);
+  const [isAiInsightLoading, setIsAiInsightLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingFilterKey, setPendingFilterKey] = useState<string | null>(null);
+
+  function beginDatasetRefresh(nextFilterKey: string | null) {
+    setPendingFilterKey(nextFilterKey);
+    setReviews([]);
+    setAnalytics(null);
+    setTotalMatches(0);
+    setTranslationMap({});
+    setDashboardInsightsRequested(false);
+    setSelectedReviewId(null);
+    setCurrentPage(1);
+    setIsLoading(true);
+    setIsAnalyticsLoading(true);
+  }
 
   const deferredSearch = useDeferredValue(filters.q);
   const effectiveFilters = useMemo(
@@ -1056,13 +1180,12 @@ export function ReviewDashboard({
   useEffect(() => {
     let isActive = true;
 
-    const cacheKey = buildDashboardCacheKey(apiFilters);
+    const cacheKey = `${buildDashboardCacheKey(apiFilters)}::page=${currentPage}`;
     const reviewCache = reviewPageCacheRef.current.get(cacheKey);
     const defaultFilters = isDefaultDashboardFilters(apiFilters);
 
     setError(null);
     setTranslationMap({});
-    setCurrentPage(1);
 
     async function loadReviewPageData() {
       if (reviewCache && reviewCache.expiresAt > Date.now()) {
@@ -1080,7 +1203,7 @@ export function ReviewDashboard({
 
       setIsLoading(true);
       try {
-        const dataset = await fetchReviewPage(apiFilters);
+        const dataset = await fetchReviewPage(apiFilters, currentPage, CLIENT_PAGE_SIZE);
         if (!isActive) return;
         reviewPageCacheRef.current.set(cacheKey, {
           data: dataset,
@@ -1112,7 +1235,7 @@ export function ReviewDashboard({
     return () => {
       isActive = false;
     };
-  }, [apiFilters, filterSeedReviews.length, pendingFilterKey]);
+  }, [apiFilters, currentPage, filterSeedReviews.length, pendingFilterKey]);
 
   useEffect(() => {
     let isActive = true;
@@ -1219,6 +1342,40 @@ export function ReviewDashboard({
   }, [effectiveDraftFilters.hotelId, mode]);
 
   useEffect(() => {
+    let isActive = true;
+    const selectedPlatforms = parsePlatformFilterValue(effectiveFilters.platformCode);
+    const selectedPlatform = selectedPlatforms.length === 1 ? selectedPlatforms[0] : "";
+
+    if (!effectiveFilters.hotelId && !selectedPlatform) {
+      setReviewCategories([]);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    fetchReviewCategoriesCurrent({
+      hotelId: effectiveFilters.hotelId || undefined,
+      platformCode: selectedPlatform || undefined,
+    })
+      .then((response) => {
+        if (!isActive) {
+          return;
+        }
+        setReviewCategories(response.items);
+      })
+      .catch(() => {
+        if (!isActive) {
+          return;
+        }
+        setReviewCategories([]);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [effectiveFilters.hotelId, effectiveFilters.platformCode]);
+
+  useEffect(() => {
     setCurrentPage(1);
   }, [tableLanguageFilters, tableScoreFilters]);
 
@@ -1319,13 +1476,10 @@ export function ReviewDashboard({
   const keywordSummary = useMemo(() => topKeywords(filteredReviews, 6), [filteredReviews]);
   const insightNotes = useMemo(() => buildInsightNotes(filteredReviews), [filteredReviews]);
 
-  const totalPages = Math.max(Math.ceil(tableFilteredReviews.length / CLIENT_PAGE_SIZE), 1);
-  const pagedReviews = tableFilteredReviews.slice(
-    (currentPage - 1) * CLIENT_PAGE_SIZE,
-    currentPage * CLIENT_PAGE_SIZE,
-  );
+  const totalPages = Math.max(Math.ceil(totalMatches / CLIENT_PAGE_SIZE), 1);
+  const pagedReviews = tableFilteredReviews;
   const selectedReview =
-    tableFilteredReviews.find((review) => review.id === selectedReviewId) || pagedReviews[0] || null;
+    tableFilteredReviews.find((review) => review.id === selectedReviewId) || tableFilteredReviews[0] || null;
 
   useEffect(() => {
     let isActive = true;
@@ -1450,6 +1604,9 @@ export function ReviewDashboard({
 
   useEffect(() => {
     setDashboardInsightsRequested(false);
+    setAiInsightContent("");
+    setAiInsightError(null);
+    setIsAiInsightLoading(false);
   }, [effectiveFilterKey]);
   const guestCountryBaseReviews = useMemo(() => {
     const sourceBase = filterSeedReviews.length > 0 ? filterSeedReviews : reviews;
@@ -1688,6 +1845,83 @@ export function ReviewDashboard({
         ? "Updating reviews..."
         : "Updating dashboard..."
       : `${displayTotalMatches} reviews matched`;
+  const showMetricSkeleton = mode === "dashboard" && isLoading && !hasReviewData;
+  const activeCategorySummary = useMemo(() => {
+    if (reviewCategories.length === 0) {
+      return null;
+    }
+
+    const selectedPlatforms = parsePlatformFilterValue(effectiveFilters.platformCode);
+    const selectedPlatform = selectedPlatforms.length === 1 ? selectedPlatforms[0] : "";
+
+    if (effectiveFilters.hotelId) {
+      return (
+        reviewCategories.find(
+          (item) =>
+            item.hotel_id === effectiveFilters.hotelId &&
+            (!selectedPlatform || item.platform_code === selectedPlatform),
+        ) || null
+      );
+    }
+
+    if (selectedPlatform) {
+      return (
+        reviewCategories.find((item) => item.platform_code === selectedPlatform) || null
+      );
+    }
+
+    return reviewCategories[0] || null;
+  }, [effectiveFilters.hotelId, effectiveFilters.platformCode, reviewCategories]);
+  const categoryData = useMemo<CategoryDatum[]>(() => {
+    if (!activeCategorySummary) {
+      return [];
+    }
+
+    const normalized = (activeCategorySummary.categories || [])
+      .filter((item) => typeof item.score === "number")
+      .map((item) => ({
+        code: item.category_code || item.category_name.toLowerCase().replace(/\s+/g, "_"),
+        label: item.category_name,
+        value: item.score || 0,
+        scale: item.score_scale || 10,
+      }));
+
+    if (normalized.length > 0) {
+      return normalized.sort((left, right) => (left.code > right.code ? 1 : -1));
+    }
+
+    const fallbackItems = Array.isArray(activeCategorySummary.raw_payload?.items)
+      ? activeCategorySummary.raw_payload.items
+      : [];
+
+    return fallbackItems
+      .filter((item) => typeof item.score === "number" && item.name)
+      .map((item, index) => ({
+        code: item.id || `category_${index + 1}`,
+        label: item.name || `Category ${index + 1}`,
+        value: item.score || 0,
+        scale: item.score_scale || 10,
+      }));
+  }, [activeCategorySummary]);
+  const insightReviewPayload = useMemo(
+    () =>
+      filteredReviews.slice(0, 12).map((review) => {
+        const localized = buildLocalizedReviewText(review, translationMap[review.id]);
+
+        return {
+          hotel_name: review.hotel_name,
+          platform_code: review.platform_code,
+          reviewer_country_code: review.reviewer_country_code,
+          rating: review.rating,
+          rating_scale: review.rating_scale,
+          reviewed_at: review.reviewed_at,
+          is_bad_review: review.is_bad_review,
+          title: localized.title,
+          body: localized.body,
+        };
+      }),
+    [filteredReviews, translationMap],
+  );
 
   return (
     <WorkspaceShell
@@ -1734,14 +1968,13 @@ export function ReviewDashboard({
                             return;
                           }
                           if (!areFiltersEqual(effectiveFilters, effectiveDraftFilters)) {
-                            setPendingFilterKey(buildDashboardCacheKey(effectiveDraftFilters));
+                            beginDatasetRefresh(buildDashboardCacheKey(effectiveDraftFilters));
                           } else {
                             setPendingFilterKey(null);
                           }
                           setFilters(draftFilters);
                           setAppliedReviewFlags(draftReviewFlags);
                           setTableScoreFilters(draftReviewFlags);
-                          setSelectedReviewId(null);
                         }}
                         className="rounded-xl bg-slate-900 px-4 py-2.5 text-[15px] font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                         disabled={isApplyingFilters || !hasPendingFilterChanges}
@@ -1751,14 +1984,13 @@ export function ReviewDashboard({
                       <button
                         type="button"
                         onClick={() => {
-                          setPendingFilterKey(buildDashboardCacheKey(enforceBadReviewMode(DEFAULT_FILTERS, mode)));
+                          beginDatasetRefresh(buildDashboardCacheKey(enforceBadReviewMode(DEFAULT_FILTERS, mode)));
                           setDraftFilters(DEFAULT_FILTERS);
                           setFilters(DEFAULT_FILTERS);
                           setDraftReviewFlags([]);
                           setAppliedReviewFlags([]);
                           setTableScoreFilters([]);
                           setTableLanguageFilters([]);
-                          setSelectedReviewId(null);
                         }}
                         className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[15px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
                       >
@@ -1940,13 +2172,13 @@ export function ReviewDashboard({
                       />
                     </FilterField>
                     <FilterField label="Date to">
-                      <DateTextControl
-                        key={`reviews-date-to-${draftFilters.dateTo}`}
-                        value={draftFilters.dateTo}
-                        placeholder="DD/MM/YY"
-                        onChange={(value) =>
-                          setDraftFilters((current) => ({ ...current, dateTo: value }))
-                        }
+                    <DateTextControl
+                      key={`reviews-date-to-${draftFilters.dateTo}`}
+                      value={draftFilters.dateTo}
+                      placeholder="DD/MM/YYYY"
+                      onChange={(value) =>
+                        setDraftFilters((current) => ({ ...current, dateTo: value }))
+                      }
                       />
                     </FilterField>
                   </div>
@@ -2116,72 +2348,89 @@ export function ReviewDashboard({
 
       <div className={mode === "dashboard" ? "space-y-6" : "hidden"}>
       <section className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-              <MetricCard
-                title="Visible reviews"
-                value={String(displayTotalMatches)}
-                helper={isLoading || isAnalyticsLoading ? "Refreshing matched rows for the current filters." : "Rows matching the current filters."}
-                accent="border-slate-200"
-                icon="table"
-              />
-              {analyticsReady ? (
+              {showMetricSkeleton ? (
                 <>
                   <MetricCard
-                    title="Average score / 10"
-                    value={displayAverageRating?.toFixed(1) || "-"}
-                    helper={
-                      isAnalyticsLoading
-                        ? "Refreshing analytics..."
-                        : useFilteredAnalytics
-                          ? `Average score inside the current ${appliedReviewFlagSummary} review set.`
-                          : "Average score in the current dataset."
-                    }
-                    tone="text-blue-600"
+                    title="Visible reviews"
+                    value="..."
+                    helper="Loading current dataset..."
                     accent="border-slate-200"
-                    icon="chart"
-                    iconTint="bg-blue-100 text-blue-600"
+                    icon="table"
                   />
-                  <MetricCard
-                    title="Hotels in view"
-                    value={useFilteredAnalytics ? String(filteredAnalyticsHotelCounts.length) : String(hotelCounts.length)}
-                    helper={
-                      isAnalyticsLoading
-                        ? "Refreshing analytics..."
-                        : useFilteredAnalytics
-                          ? `Based on the current ${appliedReviewFlagSummary} review set.`
-                          : analyticsSupportsFullDashboard
-                            ? "Distinct hotels in the aggregate dataset."
-                            : "Requires supported aggregate filters to compare hotels."
-                    }
-                    tone="text-emerald-600"
-                    accent="border-slate-200"
-                    icon="hotel"
-                    iconTint="bg-emerald-100 text-emerald-600"
-                  />
-                  <MetricCard
-                    title="Top guest country"
-                    value={useFilteredAnalytics ? filteredAnalyticsCountryCounts[0]?.label || "-" : reviewerCountryCounts[0]?.label || "-"}
-                    helper={
-                      isAnalyticsLoading
-                        ? "Refreshing analytics..."
-                        : useFilteredAnalytics
-                          ? filteredAnalyticsCountryCounts[0]
-                            ? `${filteredAnalyticsCountryCounts[0].value} reviews in the current ${appliedReviewFlagSummary} set.`
-                            : "No country data in the current filtered set."
-                          : reviewerCountryCounts[0]
-                          ? `${reviewerCountryCounts[0].value} reviews`
-                          : "No country data"
-                    }
-                    tone="text-violet-600"
-                    accent="border-slate-200"
-                    icon="globe"
-                    iconTint="bg-violet-100 text-violet-600"
-                  />
+                  <SkeletonCard />
+                  <SkeletonCard />
+                  <SkeletonCard />
                 </>
               ) : (
                 <>
-                  <SkeletonCard />
-                  <SkeletonCard />
-                  <SkeletonCard />
+                  <MetricCard
+                    title="Visible reviews"
+                    value={String(displayTotalMatches)}
+                    helper={isLoading || isAnalyticsLoading ? "Refreshing matched rows for the current filters." : "Rows matching the current filters."}
+                    accent="border-slate-200"
+                    icon="table"
+                  />
+                  {analyticsReady ? (
+                    <>
+                      <MetricCard
+                        title="Average score / 10"
+                        value={displayAverageRating?.toFixed(1) || "-"}
+                        helper={
+                          isAnalyticsLoading
+                            ? "Refreshing analytics..."
+                            : useFilteredAnalytics
+                              ? `Average score inside the current ${appliedReviewFlagSummary} review set.`
+                              : "Average score in the current dataset."
+                        }
+                        tone="text-blue-600"
+                        accent="border-slate-200"
+                        icon="chart"
+                        iconTint="bg-blue-100 text-blue-600"
+                      />
+                      <MetricCard
+                        title="Hotels in view"
+                        value={useFilteredAnalytics ? String(filteredAnalyticsHotelCounts.length) : String(hotelCounts.length)}
+                        helper={
+                          isAnalyticsLoading
+                            ? "Refreshing analytics..."
+                            : useFilteredAnalytics
+                              ? `Based on the current ${appliedReviewFlagSummary} review set.`
+                              : analyticsSupportsFullDashboard
+                                ? "Distinct hotels in the aggregate dataset."
+                                : "Requires supported aggregate filters to compare hotels."
+                        }
+                        tone="text-emerald-600"
+                        accent="border-slate-200"
+                        icon="hotel"
+                        iconTint="bg-emerald-100 text-emerald-600"
+                      />
+                      <MetricCard
+                        title="Top guest country"
+                        value={useFilteredAnalytics ? filteredAnalyticsCountryCounts[0]?.label || "-" : reviewerCountryCounts[0]?.label || "-"}
+                        helper={
+                          isAnalyticsLoading
+                            ? "Refreshing analytics..."
+                            : useFilteredAnalytics
+                              ? filteredAnalyticsCountryCounts[0]
+                                ? `${filteredAnalyticsCountryCounts[0].value} reviews in the current ${appliedReviewFlagSummary} set.`
+                                : "No country data in the current filtered set."
+                              : reviewerCountryCounts[0]
+                              ? `${reviewerCountryCounts[0].value} reviews`
+                              : "No country data"
+                        }
+                        tone="text-violet-600"
+                        accent="border-slate-200"
+                        icon="globe"
+                        iconTint="bg-violet-100 text-violet-600"
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <SkeletonCard />
+                      <SkeletonCard />
+                      <SkeletonCard />
+                    </>
+                  )}
                 </>
               )}
             </section>
@@ -2200,14 +2449,13 @@ export function ReviewDashboard({
                         return;
                       }
                       if (!areFiltersEqual(effectiveFilters, effectiveDraftFilters)) {
-                        setPendingFilterKey(buildDashboardCacheKey(effectiveDraftFilters));
+                        beginDatasetRefresh(buildDashboardCacheKey(effectiveDraftFilters));
                       } else {
                         setPendingFilterKey(null);
                       }
                       setFilters(draftFilters);
                       setAppliedReviewFlags(draftReviewFlags);
                       setTableScoreFilters(draftReviewFlags);
-                      setSelectedReviewId(null);
                     }}
                     className="rounded-xl bg-slate-900 px-4 py-2.5 text-[15px] font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                     disabled={isApplyingFilters || !hasPendingFilterChanges}
@@ -2217,14 +2465,13 @@ export function ReviewDashboard({
                   <button
                     type="button"
                     onClick={() => {
-                      setPendingFilterKey(buildDashboardCacheKey(DEFAULT_FILTERS));
+                      beginDatasetRefresh(buildDashboardCacheKey(DEFAULT_FILTERS));
                       setDraftFilters(DEFAULT_FILTERS);
                       setFilters(DEFAULT_FILTERS);
                       setDraftReviewFlags([]);
                       setAppliedReviewFlags([]);
                       setTableScoreFilters([]);
                       setTableLanguageFilters([]);
-                      setSelectedReviewId(null);
                     }}
                     className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[15px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
                   >
@@ -2313,7 +2560,7 @@ export function ReviewDashboard({
                   <DateTextControl
                     key={`dashboard-date-to-${draftFilters.dateTo}`}
                     value={draftFilters.dateTo}
-                    placeholder="DD/MM/YY"
+                    placeholder="DD/MM/YYYY"
                     compact
                     onChange={(value) =>
                       setDraftFilters((current) => ({ ...current, dateTo: value }))
@@ -2424,6 +2671,31 @@ export function ReviewDashboard({
                         </div>
                       </div>
                     ) : null}
+
+                    <div className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-4 xl:col-span-2">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[16px] font-semibold text-[#172033]">Categories</p>
+                          <p className="mt-1 text-[13px] text-[#52627A]">
+                            {activeCategorySummary
+                              ? `${activeCategorySummary.hotel_name} · ${activeCategorySummary.platform_code}`
+                              : "Current source category scores for the active hotel / OTA selection."}
+                          </p>
+                        </div>
+                        {activeCategorySummary ? (
+                          <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold uppercase tracking-[0.04em] text-slate-600">
+                            {formatDateTime(activeCategorySummary.source_captured_at)}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-5">
+                        {categoryData.length > 0 ? (
+                          <CategoryBars items={categoryData} />
+                        ) : (
+                          <EmptyState label="No category breakdown available for the current hotel / OTA filter." />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </Panel>
@@ -2435,10 +2707,48 @@ export function ReviewDashboard({
                 action={
                   <button
                     type="button"
-                    onClick={() => setDashboardInsightsRequested(true)}
+                    onClick={async () => {
+                      setDashboardInsightsRequested(true);
+                      setIsAiInsightLoading(true);
+                      setAiInsightError(null);
+
+                      try {
+                        const response = await fetchReviewInsights({
+                          totalMatches: displayTotalMatches,
+                          visibleReviewCount: filteredReviews.length,
+                          filters: {
+                            hotelId: effectiveFilters.hotelId,
+                            platformCode: parsePlatformFilterValue(effectiveFilters.platformCode),
+                            reviewerCountryCode: effectiveFilters.reviewerCountryCode,
+                            ratingMin: effectiveFilters.ratingMin,
+                            ratingMax: effectiveFilters.ratingMax,
+                            dateFrom: effectiveFilters.dateFrom,
+                            dateTo: effectiveFilters.dateTo,
+                            badOnly: effectiveFilters.badOnly,
+                            reviewFlags: appliedReviewFlags,
+                          },
+                          analyticsSummary: summary,
+                          countryBreakdown: (useFilteredAnalytics ? filteredAnalyticsCountryCounts : reviewerCountryCounts).slice(0, 6),
+                          hotelBreakdown: (useFilteredAnalytics ? filteredAnalyticsHotelCounts : hotelCounts).slice(0, 6),
+                          keywordSummary,
+                          categories: categoryData,
+                          reviews: insightReviewPayload,
+                        });
+
+                        setAiInsightContent(response.content);
+                      } catch (insightError) {
+                        setAiInsightError(
+                          insightError instanceof Error
+                            ? insightError.message
+                            : "Failed to analyze the current filtered data.",
+                        );
+                      } finally {
+                        setIsAiInsightLoading(false);
+                      }
+                    }}
                     className="rounded-xl bg-slate-900 px-4 py-2.5 text-[14px] font-semibold text-white shadow-sm transition hover:bg-slate-800"
                   >
-                    AI analyze current filtered data
+                    {isAiInsightLoading ? "Analyzing..." : "AI analyze current filtered data"}
                   </button>
                 }
               >
@@ -2448,11 +2758,29 @@ export function ReviewDashboard({
                     <SkeletonCard />
                   </div>
                 ) : !dashboardInsightsRequested ? (
-                  <EmptyState label={`Click "AI analyze current filtered data" to analyze the current filtered result set (${filteredReviews.length} reviews).`} />
+                  <EmptyState label={`Click "AI analyze current filtered data" to analyze the current filtered result set (${filteredReviews.length} visible reviews).`} />
+                ) : isAiInsightLoading ? (
+                  <div className="space-y-4">
+                    <SkeletonCard />
+                    <SkeletonCard />
+                  </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-4">
-                      <p className="text-[16px] font-semibold text-[#172033]">Operational notes</p>
+                      <p className="text-[16px] font-semibold text-[#172033]">AI analysis</p>
+                      {aiInsightError ? (
+                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] leading-6 text-red-700">
+                          {aiInsightError}
+                        </div>
+                      ) : (
+                        <div className="mt-3 rounded-xl border border-[var(--border)] bg-white px-4 py-4 text-[14px] leading-7 text-[#334155] whitespace-pre-wrap">
+                          {aiInsightContent || "AI chua tra ve noi dung phan tich."}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-4">
+                      <p className="text-[16px] font-semibold text-[#172033]">Supporting signals</p>
                       <div className="mt-3 space-y-3">
                         {insightNotes.map((note) => (
                           <div key={note} className="rounded-xl border border-[var(--border)] bg-white px-3 py-3 text-[13px] leading-6 text-[#52627A]">
@@ -2460,10 +2788,6 @@ export function ReviewDashboard({
                           </div>
                         ))}
                       </div>
-                    </div>
-
-                    <div className="rounded-[24px] border border-slate-100 bg-slate-50/80 p-4">
-                      <p className="text-[16px] font-semibold text-[#172033]">Recurring keywords</p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {keywordSummary.length > 0 ? (
                           keywordSummary.map((item) => (
@@ -2536,7 +2860,7 @@ export function ReviewDashboard({
                   <>
                     {isLoading && hasReviewData ? (
                       <div className="mb-3 rounded-2xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-[13px] text-blue-700">
-                        Review rows are updating. The table is keeping the previous result until the new dataset arrives.
+                        Review rows are updating for the current filters.
                       </div>
                     ) : null}
                     <div className="overflow-hidden rounded-[24px] border border-slate-100 bg-white shadow-sm">

@@ -32,6 +32,7 @@ class ReviewQueryService:
         sort_order: str,
         limit: int,
         offset: int,
+        hydrate_missing_translations: bool = False,
     ) -> ReviewListResponse:
         self._validate_review_filters(
             rating_min=rating_min,
@@ -56,7 +57,9 @@ class ReviewQueryService:
             limit=limit,
             offset=offset,
         )
-        items = self._hydrate_missing_translations(items)
+        items = self._normalize_review_items(items)
+        if hydrate_missing_translations:
+            items = self._hydrate_missing_translations(items)
         return ReviewListResponse(items=items, total=total, limit=limit, offset=offset)
 
     def list_review_stats(
@@ -76,15 +79,6 @@ class ReviewQueryService:
 
         for item in items:
             try:
-                corrected_bad_flag = self._compute_bad_review(item)
-                if item.get("is_bad_review") != corrected_bad_flag:
-                    item["is_bad_review"] = corrected_bad_flag
-                    self.review_repository.update_review_bad_flag(
-                        review_id=item["id"],
-                        is_bad_review=corrected_bad_flag,
-                    )
-                    changed = True
-
                 if self._has_translation(item):
                     continue
 
@@ -132,6 +126,14 @@ class ReviewQueryService:
                 self.db.rollback()
 
         return items
+
+    def _normalize_review_items(self, items: list[dict]) -> list[dict]:
+        normalized_items: list[dict] = []
+        for item in items:
+            normalized = dict(item)
+            normalized["is_bad_review"] = self._compute_bad_review(normalized)
+            normalized_items.append(normalized)
+        return normalized_items
 
     @staticmethod
     def _compute_bad_review(item: dict) -> bool:

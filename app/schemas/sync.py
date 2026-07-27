@@ -27,6 +27,15 @@ class ExternalReviewPayload(BaseModel):
     raw_payload: dict[str, Any] = Field(default_factory=dict)
 
 
+class SourceCategoryPayload(BaseModel):
+    category_code: str | None = None
+    category_name: str
+    score: float | None = None
+    score_scale: float | None = None
+    display_order: int | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class SyncReviewsRequest(BaseModel):
     hotel_id: str
     hotel_platform_account_id: str | None = None
@@ -37,6 +46,8 @@ class SyncReviewsRequest(BaseModel):
     source_review_url: str | None = None
     source_captured_at: datetime | None = None
     source_metrics_payload: dict[str, Any] = Field(default_factory=dict)
+    source_categories: list[SourceCategoryPayload] = Field(default_factory=list)
+    source_category_payload: dict[str, Any] = Field(default_factory=dict)
     reviews: list[ExternalReviewPayload] = Field(default_factory=list)
 
 
