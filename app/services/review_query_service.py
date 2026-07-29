@@ -21,6 +21,7 @@ class ReviewQueryService:
         *,
         hotel_id: str | None,
         platform_code: str | None,
+        source_link: str | None,
         is_bad_review: bool | None,
         reviewer_country_code: str | None,
         rating_min: float | None,
@@ -45,6 +46,7 @@ class ReviewQueryService:
         items, total = self.review_repository.list_reviews(
             hotel_id=hotel_id,
             platform_code=platform_code,
+            source_link=source_link,
             is_bad_review=is_bad_review,
             reviewer_country_code=reviewer_country_code,
             rating_min=rating_min,

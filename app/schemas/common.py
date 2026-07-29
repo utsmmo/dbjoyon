@@ -13,6 +13,8 @@ class ReviewSummary(TimestampedModel):
     hotel_id: str
     hotel_name: str
     platform_code: str
+    hotel_platform_account_id: str | None = None
+    source_link_used: str | None = None
     external_review_id: str
     reviewer_name: str | None
     reviewer_country_code: str | None

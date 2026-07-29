@@ -16,6 +16,7 @@ class ReviewRepository:
         *,
         hotel_id: str | None,
         platform_code: str | None,
+        source_link: str | None,
         is_bad_review: bool | None,
         reviewer_country_code: str | None,
         rating_min: float | None,
@@ -31,11 +32,14 @@ class ReviewRepository:
 
         needs_hotel_join = sort_by == "hotel_name" or bool(q)
         needs_platform_join = bool(platform_code)
+        needs_account_join = bool(source_link)
 
         if needs_hotel_join:
             joins.append("JOIN hotels h ON h.id = r.hotel_id")
         if needs_platform_join:
             joins.append("JOIN platforms p ON p.id = r.platform_id")
+        if needs_account_join:
+            joins.append("JOIN hotel_platform_accounts hpa ON hpa.id = r.hotel_platform_account_id")
 
         if hotel_id:
             filters.append("r.hotel_id = CAST(:hotel_id AS uuid)")
@@ -43,6 +47,9 @@ class ReviewRepository:
         if platform_code:
             filters.append("p.platform_code = :platform_code")
             params["platform_code"] = platform_code
+        if source_link:
+            filters.append("hpa.external_account_id = :source_link")
+            params["source_link"] = source_link
         if is_bad_review is not None:
             filters.append("r.is_bad_review = :is_bad_review")
             params["is_bad_review"] = is_bad_review
@@ -187,6 +194,7 @@ class ReviewRepository:
         *,
         hotel_id: str | None,
         platform_code: str | None,
+        source_link: str | None,
         is_bad_review: bool | None,
         reviewer_country_code: str | None,
         rating_min: float | None,
@@ -210,6 +218,7 @@ class ReviewRepository:
         join_clause, where_clause, filter_params = self._build_review_query_parts(
             hotel_id=hotel_id,
             platform_code=platform_code,
+            source_link=source_link,
             is_bad_review=is_bad_review,
             reviewer_country_code=reviewer_country_code,
             rating_min=rating_min,
@@ -250,6 +259,8 @@ class ReviewRepository:
                 r.hotel_id::text AS hotel_id,
                 h.hotel_name,
                 p.platform_code,
+                r.hotel_platform_account_id::text AS hotel_platform_account_id,
+                hpa.external_account_id AS source_link_used,
                 r.external_review_id,
                 r.reviewer_name,
                 r.reviewer_country_code,
@@ -272,6 +283,7 @@ class ReviewRepository:
             JOIN reviews r ON r.id = pid.id
             JOIN hotels h ON h.id = r.hotel_id
             JOIN platforms p ON p.id = r.platform_id
+            LEFT JOIN hotel_platform_accounts hpa ON hpa.id = r.hotel_platform_account_id
             ORDER BY {sort_expression} {sort_order_sql} NULLS LAST, r.created_at DESC, r.id DESC
             """
         )

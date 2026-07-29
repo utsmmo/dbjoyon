@@ -14,6 +14,7 @@ router = APIRouter(tags=["reviews"])
 def list_reviews(
     hotel_id: str | None = Query(default=None),
     platform_code: str | None = Query(default=None),
+    source_link: str | None = Query(default=None),
     is_bad_review: bool | None = Query(default=None),
     reviewer_country_code: str | None = Query(default=None),
     rating_min: float | None = Query(default=None),
@@ -33,6 +34,7 @@ def list_reviews(
         return service.list_reviews(
             hotel_id=hotel_id,
             platform_code=platform_code,
+            source_link=source_link,
             is_bad_review=is_bad_review,
             reviewer_country_code=reviewer_country_code,
             rating_min=rating_min,
@@ -54,6 +56,7 @@ def list_reviews(
 def list_bad_reviews(
     hotel_id: str | None = Query(default=None),
     platform_code: str | None = Query(default=None),
+    source_link: str | None = Query(default=None),
     reviewer_country_code: str | None = Query(default=None),
     rating_min: float | None = Query(default=None),
     rating_max: float | None = Query(default=None),
@@ -72,6 +75,7 @@ def list_bad_reviews(
         return service.list_reviews(
             hotel_id=hotel_id,
             platform_code=platform_code,
+            source_link=source_link,
             is_bad_review=True,
             reviewer_country_code=reviewer_country_code,
             rating_min=rating_min,
