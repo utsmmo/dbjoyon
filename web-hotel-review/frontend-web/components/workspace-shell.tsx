@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-type WorkspaceMode = "home" | "dashboard" | "reviews";
+type WorkspaceMode = "home" | "dashboard" | "reviews" | "admin" | "users";
 
 type IconName =
   | "dashboard"
@@ -161,7 +161,12 @@ export function WorkspaceShell({
   showHeaderActions?: boolean;
   children: React.ReactNode;
 }) {
-  const activeSection = mode === "dashboard" || mode === "reviews" ? "review" : null;
+  const activeSection =
+    mode === "dashboard" || mode === "reviews"
+      ? "review"
+      : mode === "admin" || mode === "users"
+        ? "administration"
+        : null;
   const [expandedSection, setExpandedSection] = useState<SectionKey | null>(activeSection);
   const [mobileNavVisible, setMobileNavVisible] = useState(false);
 
@@ -178,10 +183,13 @@ export function WorkspaceShell({
   ];
 
   const administrationItems: NavItem[] = [
-    { label: "Users & roles", badge: "Coming soon", disabled: true, icon: "users" },
-    { label: "Hotel panel", badge: "Coming soon", disabled: true, icon: "hotel" },
+    { label: "Users & roles", href: "/admin/users", badge: "Live", icon: "users" },
+    { label: "Hotel panel", href: "/admin", badge: "Live", icon: "hotel" },
     { label: "Settings", badge: "Coming soon", disabled: true, icon: "settings" },
   ];
+
+  const activeHref =
+    mode === "users" ? "/admin/users" : mode === "admin" ? "/admin" : mode === "dashboard" || mode === "reviews" ? "/" : "";
 
   const sections: NavSection[] = [
     { key: "review" as const, label: "Review", href: "/", icon: "dashboard" },
@@ -267,7 +275,7 @@ export function WorkspaceShell({
                         <SidebarLink
                           key={item.label}
                           item={item}
-                          active={section.key === "review" && (mode === "dashboard" || mode === "reviews")}
+                          active={item.href === activeHref}
                         />
                       ))}
                     </div>
@@ -387,7 +395,7 @@ export function WorkspaceShell({
                                 <SidebarLink
                                   key={item.label}
                                   item={item}
-                                  active={section.key === "review" && (mode === "dashboard" || mode === "reviews")}
+                                  active={item.href === activeHref}
                                 />
                               ))}
                             </div>

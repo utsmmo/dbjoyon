@@ -28,12 +28,14 @@ Bo khung giai doan 1 cho he thong quan tri review va du lieu noi bo chuoi khach 
 |-- docker-compose.yml
 |-- .env.example
 |-- docs
-|   |-- CRAWLER_HANDOFF_PLAYBOOK.md
+|   |-- Crawl
+|   |   |-- ADMIN_CRAWLER_HOTEL_LINK_PLAN.md
+|   |   |-- CRAWLER_DOC_START_HERE.md
+|   |   |-- CRAWLER_OTA_ENDPOINT_MATRIX.md
+|   |   `-- POST_REVIEW_GUIDE.md
 |   |-- DB_BACKUP_GOOGLE_DRIVE.md
 |   |-- DEPLOY_ONLINE_QUICKSTART.md
-|   |-- LEGACY_BOOKING_CLEANUP.md
-|   |-- AI_CRAWLER_API_CONTRACT.md
-|   `-- POST_REVIEW_GUIDE.md
+|   `-- LEGACY_BOOKING_CLEANUP.md
 |-- ops
 |   |-- backup
 |   |   |-- backup-db.ps1
@@ -440,10 +442,7 @@ File huong dan va mau config da co san:
 - [docs/DEPLOY_ONLINE_QUICKSTART.md](D:/AutoCode/DB/Review/docs/DEPLOY_ONLINE_QUICKSTART.md)
 - [docs/DB_BACKUP_GOOGLE_DRIVE.md](D:/AutoCode/DB/Review/docs/DB_BACKUP_GOOGLE_DRIVE.md)
 - [docs/LEGACY_BOOKING_CLEANUP.md](D:/AutoCode/DB/Review/docs/LEGACY_BOOKING_CLEANUP.md)
-- [docs/CRAWLER_HANDOFF_PLAYBOOK.md](D:/AutoCode/DB/Review/docs/CRAWLER_HANDOFF_PLAYBOOK.md)
-- [docs/AI_CRAWLER_API_CONTRACT.md](D:/AutoCode/DB/Review/docs/AI_CRAWLER_API_CONTRACT.md)
-- [docs/POST_REVIEW_GUIDE.md](D:/AutoCode/DB/Review/docs/POST_REVIEW_GUIDE.md)
-- [docs/AGODA_UPLOAD_GUIDE.md](D:/AutoCode/DB/Review/docs/AGODA_UPLOAD_GUIDE.md)
+- [docs/Crawl/POST_REVIEW_GUIDE.md](D:/AutoCode/DB/Review/docs/Crawl/POST_REVIEW_GUIDE.md)
 - [docs/WEBSITE_DB_HANDOFF.md](D:/AutoCode/DB/Review/docs/WEBSITE_DB_HANDOFF.md)
 - [docs/WEBSITE_QUERY_GUIDE.md](D:/AutoCode/DB/Review/docs/WEBSITE_QUERY_GUIDE.md)
 - [docs/DASHBOARD_ANALYTICS_ARCHITECTURE.md](D:/AutoCode/DB/Review/docs/DASHBOARD_ANALYTICS_ARCHITECTURE.md)

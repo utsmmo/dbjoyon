@@ -380,24 +380,41 @@ function DateTextControl({
   const pickerRef = useRef<HTMLInputElement | null>(null);
 
   const displayValue = formatIsoDateForDisplay(value);
+  const openPicker = () => {
+    const input = pickerRef.current;
+    if (!input) {
+      return;
+    }
+
+    input.focus({ preventScroll: true });
+    input.showPicker?.();
+  };
 
   return (
-    <div className="relative w-full min-w-0">
+    <div className="relative w-full min-w-0" onClick={openPicker}>
       <InputControl
         type="text"
         readOnly
         value={displayValue}
         placeholder={placeholder}
-        onClick={() => pickerRef.current?.showPicker?.()}
-        className={compact ? "pr-10" : undefined}
+        onClick={openPicker}
+        onFocus={openPicker}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openPicker();
+          }
+        }}
+        className={`${compact ? "pr-10" : ""} cursor-pointer`}
       />
       <input
         ref={pickerRef}
         type="date"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="absolute inset-0 cursor-pointer opacity-0"
+        className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
         aria-label={placeholder}
+        tabIndex={-1}
       />
       <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-slate-400">
         <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
@@ -613,13 +630,11 @@ function SourceCheckboxGroup({
                   }`}
                 >
                   <input
-                    type="checkbox"
+                    type="radio"
+                    name="platform-filter"
                     checked={active}
                     onChange={() => {
-                      const nextSelected = active
-                        ? selected.filter((item) => item !== option.value)
-                        : [...selected, option.value];
-                      onChange(nextSelected.join(","));
+                      onChange(active ? "" : option.value);
                     }}
                     className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
@@ -942,17 +957,29 @@ function SkeletonCard() {
 }
 
 function buildAnalyticsSupportMessage(unsupportedFilters: string[]) {
-  const unsupportedSet = new Set(unsupportedFilters);
-
-  if (unsupportedSet.has("rating_min") || unsupportedSet.has("rating_max")) {
-    return "Aggregate analytics currently does not support Flag or score-range filtering. The review list below is still filtering correctly.";
-  }
-
   if (unsupportedFilters.length === 0) {
     return "The aggregate dashboard is using the default all-time snapshot or the current supported filters.";
   }
 
-  return `Aggregate cards and charts do not yet support: ${unsupportedFilters.join(", ")}. Remove those filters if you want the dashboard totals to align completely.`;
+  const filterLabels = unsupportedFilters.map((filter) => {
+    switch (filter) {
+      case "reviewer_country_code":
+        return "guest country breakdowns";
+      case "rating_min":
+      case "rating_max":
+        return "score range";
+      case "q":
+        return "keyword search";
+      case "is_bad_review":
+        return "bad-review only";
+      case "partial_date_range":
+        return "a one-sided date range";
+      default:
+        return filter;
+    }
+  });
+
+  return `Aggregate charts are currently unavailable for ${filterLabels.join(", ")}. The review list still uses your filters, and supported summary cards stay aligned where possible.`;
 }
 
 function buildReviewMixFromBuckets(buckets: DashboardAnalyticsResponse["score_buckets"]) {
@@ -1648,11 +1675,15 @@ export function ReviewDashboard({
   const analyticsReady = analytics !== null;
   const analyticsSupportsFullDashboard = analytics?.supports_full_analytics ?? false;
   const unsupportedAnalyticsFilters = analytics?.unsupported_filters ?? [];
-  const analyticsBlockedByRatingFilter =
-    unsupportedAnalyticsFilters.includes("rating_min") ||
-    unsupportedAnalyticsFilters.includes("rating_max");
-  const useFilteredAnalytics =
-    appliedReviewFlags.length > 0 || analyticsBlockedByRatingFilter;
+  const useFilteredAnalytics = appliedReviewFlags.length > 0;
+  const summaryBlockedByUnsupportedFilters = unsupportedAnalyticsFilters.some(
+    (filter) =>
+      filter === "rating_min" ||
+      filter === "rating_max" ||
+      filter === "q" ||
+      filter === "is_bad_review",
+  );
+  const canShowAggregateBreakdowns = analyticsSupportsFullDashboard || useFilteredAnalytics;
   const filteredAverageRating = useMemo(() => {
     const ratedReviews = filteredReviews.filter(
       (review) => typeof review.rating === "number" && !Number.isNaN(review.rating),
@@ -1665,8 +1696,13 @@ export function ReviewDashboard({
     const totalRating = ratedReviews.reduce((sum, review) => sum + (review.rating ?? 0), 0);
     return totalRating / ratedReviews.length;
   }, [filteredReviews]);
-  const displayTotalMatches = useFilteredAnalytics ? filteredReviews.length : summary?.total_reviews ?? totalMatches;
-  const displayAverageRating = useFilteredAnalytics ? filteredAverageRating : summary?.avg_rating ?? null;
+  const displayTotalMatches = useFilteredAnalytics ? filteredReviews.length : totalMatches;
+  const displayAverageRating = useFilteredAnalytics
+    ? filteredAverageRating
+    : summaryBlockedByUnsupportedFilters
+      ? null
+      : summary?.avg_rating ?? null;
+  const displayTotalPages = useFilteredAnalytics ? 1 : totalPages;
   const analyticsSupportMessage = analytics
     ? buildAnalyticsSupportMessage(unsupportedAnalyticsFilters)
     : "Loading analytics...";
@@ -2073,7 +2109,7 @@ export function ReviewDashboard({
                     <FilterField label="Hotel">
                       <SelectControl value={draftFilters.hotelId} onChange={(value) => setDraftFilters((current) => ({ ...current, hotelId: value }))} options={hotelOptions} />
                     </FilterField>
-                    <FilterField label="OTA">
+                    <FilterField label="OTA (single)">
                       <SourceCheckboxGroup
                         value={draftFilters.platformCode}
                         onChange={(value) => setDraftFilters((current) => ({ ...current, platformCode: value }))}
@@ -2380,6 +2416,8 @@ export function ReviewDashboard({
                             ? "Refreshing analytics..."
                             : useFilteredAnalytics
                               ? `Average score inside the current ${appliedReviewFlagSummary} review set.`
+                              : summaryBlockedByUnsupportedFilters
+                                ? "Aggregate average score is hidden because the active filters are not fully supported by analytics."
                               : "Average score in the current dataset."
                         }
                         tone="text-blue-600"
@@ -2389,7 +2427,13 @@ export function ReviewDashboard({
                       />
                       <MetricCard
                         title="Hotels in view"
-                        value={useFilteredAnalytics ? String(filteredAnalyticsHotelCounts.length) : String(hotelCounts.length)}
+                        value={
+                          canShowAggregateBreakdowns
+                            ? useFilteredAnalytics
+                              ? String(filteredAnalyticsHotelCounts.length)
+                              : String(hotelCounts.length)
+                            : "-"
+                        }
                         helper={
                           isAnalyticsLoading
                             ? "Refreshing analytics..."
@@ -2397,7 +2441,7 @@ export function ReviewDashboard({
                               ? `Based on the current ${appliedReviewFlagSummary} review set.`
                               : analyticsSupportsFullDashboard
                                 ? "Distinct hotels in the aggregate dataset."
-                                : "Requires supported aggregate filters to compare hotels."
+                                : "Needs analytics filters that support aggregate hotel breakdowns."
                         }
                         tone="text-emerald-600"
                         accent="border-slate-200"
@@ -2406,7 +2450,13 @@ export function ReviewDashboard({
                       />
                       <MetricCard
                         title="Top guest country"
-                        value={useFilteredAnalytics ? filteredAnalyticsCountryCounts[0]?.label || "-" : reviewerCountryCounts[0]?.label || "-"}
+                        value={
+                          canShowAggregateBreakdowns
+                            ? useFilteredAnalytics
+                              ? filteredAnalyticsCountryCounts[0]?.label || "-"
+                              : reviewerCountryCounts[0]?.label || "-"
+                            : "-"
+                        }
                         helper={
                           isAnalyticsLoading
                             ? "Refreshing analytics..."
@@ -2414,9 +2464,9 @@ export function ReviewDashboard({
                               ? filteredAnalyticsCountryCounts[0]
                                 ? `${filteredAnalyticsCountryCounts[0].value} reviews in the current ${appliedReviewFlagSummary} set.`
                                 : "No country data in the current filtered set."
-                              : reviewerCountryCounts[0]
+                              : canShowAggregateBreakdowns && reviewerCountryCounts[0]
                               ? `${reviewerCountryCounts[0].value} reviews`
-                              : "No country data"
+                              : "Needs analytics filters that support aggregate country breakdowns."
                         }
                         tone="text-violet-600"
                         accent="border-slate-200"
@@ -2484,7 +2534,7 @@ export function ReviewDashboard({
                 <FilterField label="Hotel">
                   <SelectControl value={draftFilters.hotelId} onChange={(value) => setDraftFilters((current) => ({ ...current, hotelId: value }))} options={hotelOptions} />
                 </FilterField>
-                <FilterField label="OTA">
+                <FilterField label="OTA (single)">
                   <SourceCheckboxGroup
                     value={draftFilters.platformCode}
                     onChange={(value) => setDraftFilters((current) => ({ ...current, platformCode: value }))}
@@ -2996,12 +3046,12 @@ export function ReviewDashboard({
 
                     <div className="mt-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
                       <p className="text-[14px] text-[#52627A]">
-                        Page {currentPage} of {totalPages}
+                        Page {useFilteredAnalytics ? 1 : currentPage} of {displayTotalPages}
                       </p>
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          disabled={currentPage === 1}
+                          disabled={useFilteredAnalytics || currentPage === 1}
                           onClick={() => setCurrentPage((page) => Math.max(page - 1, 1))}
                           className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
                         >
@@ -3009,8 +3059,8 @@ export function ReviewDashboard({
                         </button>
                         <button
                           type="button"
-                          disabled={currentPage === totalPages}
-                          onClick={() => setCurrentPage((page) => Math.min(page + 1, totalPages))}
+                          disabled={useFilteredAnalytics || currentPage === displayTotalPages}
+                          onClick={() => setCurrentPage((page) => Math.min(page + 1, displayTotalPages))}
                           className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-slate-700 shadow-sm disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           Next

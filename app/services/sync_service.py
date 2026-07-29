@@ -2,11 +2,13 @@ from sqlalchemy.orm import Session
 
 from app.repositories.incident_repository import IncidentRepository
 from app.repositories.review_category_repository import ReviewCategoryRepository
+from app.repositories.hotel_repository import HotelRepository
 from app.repositories.platform_repository import PlatformRepository
 from app.repositories.review_metric_repository import ReviewMetricRepository
 from app.repositories.review_repository import ReviewRepository
 from app.repositories.sync_job_repository import SyncJobRepository
 from app.schemas.sync import SyncReviewsRequest, SyncReviewsResponse
+from app.services.link_normalizer import normalize_source_link
 from app.services.platform_registry import get_review_mapper
 from app.services.translation_service import TranslationService
 
@@ -14,6 +16,7 @@ from app.services.translation_service import TranslationService
 class ReviewSyncService:
     def __init__(self, db: Session) -> None:
         self.db = db
+        self.hotel_repository = HotelRepository(db)
         self.platform_repository = PlatformRepository(db)
         self.sync_job_repository = SyncJobRepository(db)
         self.review_repository = ReviewRepository(db)
@@ -31,6 +34,26 @@ class ReviewSyncService:
         platform = self.platform_repository.get_platform_by_code(platform_code)
         if platform is None:
             raise ValueError(f"Platform not found or inactive: {platform_code}")
+
+        hotel = self.hotel_repository.get_hotel_by_id(payload.hotel_id)
+        if hotel is None:
+            raise ValueError(f"Hotel not found: {payload.hotel_id}")
+
+        if payload.source_link_used:
+            normalized_source_link = normalize_source_link(
+                platform_code,
+                payload.source_link_used,
+            )
+            source_links = (
+                hotel.get("metadata", {}).get("source_links", {}).get(platform_code, [])
+            )
+            normalized_source_links = [
+                normalize_source_link(platform_code, link) for link in source_links
+            ]
+            if normalized_source_link not in normalized_source_links:
+                raise ValueError(
+                    "source_link_used is not registered for this hotel and platform"
+                )
 
         mapper = get_review_mapper(platform_code)
         sync_job_id = self.sync_job_repository.create_job(
@@ -147,6 +170,7 @@ class ReviewSyncService:
                         "source_average_rating": payload.source_average_rating,
                         "source_rating_scale": payload.source_rating_scale,
                         "source_review_url": payload.source_review_url,
+                        "source_link_used": payload.source_link_used,
                         "source_captured_at": payload.source_captured_at.isoformat()
                         if payload.source_captured_at
                         else None,

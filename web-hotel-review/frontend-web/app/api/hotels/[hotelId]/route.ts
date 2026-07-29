@@ -3,22 +3,30 @@ import { getServerApiBaseUrl } from "@/lib/server-api";
 
 const API_BASE_URL = getServerApiBaseUrl();
 
-export async function GET(request: NextRequest) {
-  const url = new URL("/api/v1/hotels", API_BASE_URL);
-  request.nextUrl.searchParams.forEach((value, key) => {
-    url.searchParams.set(key, value);
-  });
+type RouteContext = {
+  params: Promise<{
+    hotelId: string;
+  }>;
+};
+
+export async function PUT(request: NextRequest, context: RouteContext) {
+  const { hotelId } = await context.params;
+  const url = new URL(`/api/v1/system/hotels/${hotelId}`, API_BASE_URL);
+  const body = await request.text();
 
   const response = await fetch(url.toString(), {
+    method: "PUT",
     cache: "no-store",
     headers: {
       Accept: "application/json",
+      "Content-Type": "application/json",
     },
+    body,
   });
 
-  const body = await response.text();
+  const responseBody = await response.text();
 
-  return new NextResponse(body, {
+  return new NextResponse(responseBody, {
     status: response.status,
     headers: {
       "content-type": response.headers.get("content-type") || "application/json",
@@ -26,18 +34,16 @@ export async function GET(request: NextRequest) {
   });
 }
 
-export async function POST(request: NextRequest) {
-  const url = new URL("/api/v1/system/hotels", API_BASE_URL);
-  const body = await request.text();
+export async function DELETE(_request: NextRequest, context: RouteContext) {
+  const { hotelId } = await context.params;
+  const url = new URL(`/api/v1/system/hotels/${hotelId}`, API_BASE_URL);
 
   const response = await fetch(url.toString(), {
-    method: "POST",
+    method: "DELETE",
     cache: "no-store",
     headers: {
       Accept: "application/json",
-      "Content-Type": "application/json",
     },
-    body,
   });
 
   const responseBody = await response.text();

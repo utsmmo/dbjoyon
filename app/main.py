@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.api.routes.health import router as health_router
 from app.api.routes.google_sheets import router as google_sheets_router
+from app.api.routes.access_admin import router as access_admin_router
 from app.api.routes.hotels import router as hotels_router
 from app.api.routes.incidents import router as incidents_router
 from app.api.routes.notifications import router as notifications_router
@@ -22,6 +23,7 @@ app = FastAPI(
 
 app.include_router(health_router)
 app.include_router(hotels_router, prefix="/api/v1")
+app.include_router(access_admin_router, prefix="/api/v1")
 app.include_router(google_sheets_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
 app.include_router(reviews_router, prefix="/api/v1")

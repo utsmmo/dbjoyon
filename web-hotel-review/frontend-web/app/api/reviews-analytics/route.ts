@@ -100,11 +100,13 @@ function buildBaseAnalyticsParams(searchParams: URLSearchParams) {
 
   const hotelId = searchParams.get("hotel_id");
   const platformCode = searchParams.get("platform_code");
+  const reviewerCountryCode = searchParams.get("reviewer_country_code");
   const dateFrom = searchParams.get("date_from");
   const dateTo = searchParams.get("date_to");
 
   if (hotelId) params.set("hotel_id", hotelId);
   if (platformCode) params.set("platform_code", platformCode);
+  if (reviewerCountryCode) params.set("reviewer_country_code", reviewerCountryCode);
   if (dateFrom) params.set("date_from", dateFrom);
   if (dateTo) params.set("date_to", dateTo);
 
@@ -132,12 +134,15 @@ function applyAggregateDateRange(searchParams: URLSearchParams, params: URLSearc
 
 function getUnsupportedFilters(searchParams: URLSearchParams) {
   const unsupported: string[] = [];
+  const dateFrom = searchParams.get("date_from");
+  const dateTo = searchParams.get("date_to");
 
   if (searchParams.get("reviewer_country_code")) unsupported.push("reviewer_country_code");
   if (searchParams.get("rating_min")) unsupported.push("rating_min");
   if (searchParams.get("rating_max")) unsupported.push("rating_max");
   if (searchParams.get("q")) unsupported.push("q");
   if (searchParams.get("is_bad_review")) unsupported.push("is_bad_review");
+  if ((dateFrom && !dateTo) || (!dateFrom && dateTo)) unsupported.push("partial_date_range");
 
   return unsupported;
 }

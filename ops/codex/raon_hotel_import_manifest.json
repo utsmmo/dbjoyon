@@ -1,0 +1,165 @@
+[
+  {
+    "hotel_code": "danang_beach",
+    "hotel_name": "Danang Beach",
+    "city": "Da Nang",
+    "country_code": "VN",
+    "status": "active",
+    "links": {
+      "agoda": [
+        "https://www.agoda.com/vi-vn/beach-hotel-by-raon-stay-24h/hotel/da-nang-vn.html"
+      ],
+      "traveloka": [
+        "https://trv.lk/89629f46"
+      ],
+      "expedia": [
+        "https://expe.onelink.me/hnLd/uwhsphnn"
+      ],
+      "ctrip": [
+        "https://www.trip.com/w/M9hSqYdxeV2"
+      ]
+    }
+  },
+  {
+    "hotel_code": "the_grace",
+    "hotel_name": "The Grace",
+    "city": "Hoi An",
+    "country_code": "VN",
+    "status": "active",
+    "links": {
+      "booking": [
+        "https://www.booking.com/Share-rQYXacH"
+      ],
+      "agoda": [
+        "https://www.agoda.com/vi-vn/hoa-co-villas_2/hotel/hoi-an-vn.html"
+      ],
+      "expedia": [
+        "https://expe.onelink.me/hnLd/jrb1hcn1"
+      ],
+      "ctrip": [
+        "https://www.trip.com/w/OrDR16ctfV2"
+      ]
+    }
+  },
+  {
+    "hotel_code": "villa",
+    "hotel_name": "Villa",
+    "city": "Da Nang",
+    "country_code": "VN",
+    "status": "active",
+    "links": {
+      "booking": [
+        "https://www.booking.com/Share-H39M2G"
+      ],
+      "agoda": [
+        "https://www.agoda.com/vi-vn/ania-private-pool-villas-collection/hotel/da-nang-vn.html"
+      ],
+      "expedia": [
+        "https://expe.onelink.me/hnLd/c3gykkkg"
+      ],
+      "ctrip": [
+        "https://www.trip.com/w/Gxel8zlweV2"
+      ]
+    }
+  },
+  {
+    "hotel_code": "beachfront_hotel_hoi_an",
+    "hotel_name": "Beachfront Hotel Hoi An",
+    "city": "Hoi An",
+    "country_code": "VN",
+    "status": "active",
+    "links": {
+      "booking": [
+        "https://www.booking.com/Share-Hv0rya"
+      ],
+      "agoda": [
+        "https://www.agoda.com/vi-vn/raon-frontbeach-hotel/hotel/hoi-an-vn.html"
+      ],
+      "expedia": [
+        "https://expe.onelink.me/hnLd/9i46xp8j"
+      ]
+    }
+  },
+  {
+    "hotel_code": "sala_hoian_hotel",
+    "hotel_name": "Sala Hoian Hotel",
+    "city": "Hoi An",
+    "country_code": "VN",
+    "status": "active",
+    "links": {
+      "booking": [
+        "https://www.booking.com/Share-7aOvia"
+      ],
+      "agoda": [
+        "https://www.agoda.com/vi-vn/raon-hoian-gardenview/hotel/hoi-an-vn.html"
+      ],
+      "expedia": [
+        "https://expe.onelink.me/hnLd/ufjhl72q"
+      ]
+    }
+  },
+  {
+    "hotel_code": "old_town_hotel",
+    "hotel_name": "Old Town Hotel",
+    "city": "Hoi An",
+    "country_code": "VN",
+    "status": "active",
+    "links": {
+      "booking": [
+        "https://www.booking.com/Share-k5Xq2s"
+      ],
+      "agoda": [
+        "https://www.agoda.com/vi-vn/vi-vn/old-town-hotel/hotel/hoi-an-vn.html"
+      ],
+      "ctrip": [
+        "https://www.trip.com/w/mpxvlqlxeV2"
+      ]
+    }
+  },
+  {
+    "hotel_code": "eco_hoian_hotel",
+    "hotel_name": "Eco hoian Hotel",
+    "city": "Hoi An",
+    "country_code": "VN",
+    "status": "active",
+    "links": {
+      "booking": [
+        "https://www.booking.com/Share-b4fw8O"
+      ],
+      "agoda": [
+        "https://www.agoda.com/vi-vn/raon-old-quarter-hotel/hotel/hoi-an-vn.html"
+      ],
+      "ctrip": [
+        "https://www.trip.com/w/JP2Tn3ixeV2"
+      ]
+    }
+  },
+  {
+    "hotel_code": "la_alba_villa",
+    "hotel_name": "La Alba Villa",
+    "city": "Hoi An",
+    "country_code": "VN",
+    "status": "active",
+    "links": {
+      "booking": [
+        "https://www.booking.com/Share-EphH3hW"
+      ],
+      "agoda": [
+        "https://www.agoda.com/vi-vn/hoa-co-villas_3/hotel/hoi-an-vn.html"
+      ],
+      "expedia": [
+        "https://expe.onelink.me/hnLd/0kjn8c9k"
+      ],
+      "ctrip": [
+        "https://www.trip.com/w/AI9TfxixeV2"
+      ]
+    }
+  },
+  {
+    "hotel_code": "slivin_sg",
+    "hotel_name": "SLIVIN SG",
+    "country_code": "VN",
+    "status": "active",
+    "links": {}
+  }
+]

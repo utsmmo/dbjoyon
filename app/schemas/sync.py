@@ -39,6 +39,7 @@ class SourceCategoryPayload(BaseModel):
 class SyncReviewsRequest(BaseModel):
     hotel_id: str
     hotel_platform_account_id: str | None = None
+    source_link_used: str | None = None
     triggered_by: str = "api"
     source_total_reviews: int | None = None
     source_average_rating: float | None = None

@@ -13,11 +13,13 @@ def create_hotel(
     payload: HotelCreateRequest,
     db: Session = Depends(db_session),
 ) -> HotelResponse:
-    service = HotelService(db)
-    try:
-        return service.create_hotel(payload)
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=(
+            "Public hotel creation is disabled. "
+            "Use the admin system hotel endpoints and pre-approved hotel list only."
+        ),
+    )
 
 
 @router.get("/hotels", response_model=HotelListResponse)

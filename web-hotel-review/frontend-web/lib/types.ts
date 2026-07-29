@@ -5,6 +5,57 @@ export type Hotel = {
   country_code: string | null;
   city: string | null;
   status: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type HotelLinks = Record<string, string[]>;
+
+export type AdminHotel = Hotel & {
+  metadata: {
+    source_links?: HotelLinks;
+    canonical_links?: Record<string, string>;
+    [key: string]: unknown;
+  };
+};
+
+export type AccessPermission = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+};
+
+export type AccessRole = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  permissions: AccessPermission[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type AccessRoleSummary = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+export type AccessUser = {
+  id: string;
+  email: string;
+  full_name: string;
+  is_active: boolean;
+  roles: AccessRoleSummary[];
+  hotel_ids: string[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type RoleListResponse = {
+  items: AccessRole[];
+  total: number;
 };
 
 export type Review = {

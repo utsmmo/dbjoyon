@@ -44,7 +44,7 @@ export function buildReviewQuery(filters: DashboardFilters) {
   const selectedPlatforms = parsePlatformFilterValue(filters.platformCode);
 
   if (filters.hotelId) params.set("hotel_id", filters.hotelId);
-  if (selectedPlatforms.length === 1) params.set("platform_code", selectedPlatforms[0]);
+  if (selectedPlatforms.length > 0) params.set("platform_code", selectedPlatforms[0]);
   if (filters.badOnly) params.set("is_bad_review", "true");
   if (filters.reviewerCountryCode) {
     params.set("reviewer_country_code", filters.reviewerCountryCode);

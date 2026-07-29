@@ -3,12 +3,8 @@ import { getServerApiBaseUrl } from "@/lib/server-api";
 
 const API_BASE_URL = getServerApiBaseUrl();
 
-export async function GET(request: NextRequest) {
-  const url = new URL("/api/v1/hotels", API_BASE_URL);
-  request.nextUrl.searchParams.forEach((value, key) => {
-    url.searchParams.set(key, value);
-  });
-
+export async function GET() {
+  const url = new URL("/api/v1/admin/roles", API_BASE_URL);
   const response = await fetch(url.toString(), {
     cache: "no-store",
     headers: {
@@ -27,9 +23,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const url = new URL("/api/v1/system/hotels", API_BASE_URL);
+  const url = new URL("/api/v1/admin/roles", API_BASE_URL);
   const body = await request.text();
-
   const response = await fetch(url.toString(), {
     method: "POST",
     cache: "no-store",
@@ -41,7 +36,6 @@ export async function POST(request: NextRequest) {
   });
 
   const responseBody = await response.text();
-
   return new NextResponse(responseBody, {
     status: response.status,
     headers: {

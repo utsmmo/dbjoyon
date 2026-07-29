@@ -13,3 +13,8 @@ build/
 *.egg-info/
 .DS_Store
 Thumbs.db
+.gitnexus/
+.claude/
+.codex/
+%TEMP%/
+web-hotel-review/.env.production
