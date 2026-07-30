@@ -65,8 +65,25 @@ class ReviewSyncService:
                 )
             )
             if resolved_hotel_platform_account is None:
-                raise ValueError(
-                    "source_link_used is registered on hotel metadata but missing hotel_platform_account"
+                resolved_hotel_platform_account = (
+                    self.hotel_repository.create_hotel_platform_account(
+                        hotel_id=payload.hotel_id,
+                        platform_id=str(platform["id"]),
+                        external_account_id=resolved_source_link,
+                        display_name=hotel.get("hotel_name"),
+                        config={
+                            "source_link": resolved_source_link,
+                            "canonical_link": resolved_source_link,
+                            "platform_code": platform_code,
+                        },
+                        raw_payload={
+                            "source_link": resolved_source_link,
+                            "canonical_link": resolved_source_link,
+                            "platform_code": platform_code,
+                            "source_links": source_links,
+                            "created_from": "sync_source_link_auto_heal",
+                        },
+                    )
                 )
 
         if payload.hotel_platform_account_id:
