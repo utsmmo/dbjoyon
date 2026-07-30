@@ -98,3 +98,30 @@ export async function GET(request: NextRequest) {
     },
   });
 }
+
+export async function DELETE(request: NextRequest) {
+  const url = new URL("/api/v1/reviews", API_BASE_URL);
+  request.nextUrl.searchParams.forEach((value, key) => {
+    url.searchParams.set(key, value);
+  });
+
+  const response = await fetch(url.toString(), {
+    method: "DELETE",
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  responseCache.clear();
+  pendingRequests.clear();
+
+  const body = await response.text();
+
+  return new NextResponse(body, {
+    status: response.status,
+    headers: {
+      "content-type": response.headers.get("content-type") || "application/json",
+    },
+  });
+}

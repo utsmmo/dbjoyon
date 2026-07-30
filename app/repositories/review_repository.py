@@ -11,6 +11,31 @@ class ReviewRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    def get_review_by_id(
+        self,
+        *,
+        review_id: str,
+    ) -> dict[str, Any] | None:
+        result = self.db.execute(
+            text(
+                """
+                SELECT
+                    r.id::text AS review_id,
+                    r.hotel_id::text AS hotel_id,
+                    p.id::text AS platform_id,
+                    p.platform_code,
+                    r.hotel_platform_account_id::text AS hotel_platform_account_id,
+                    hpa.external_account_id AS source_link_used
+                FROM reviews r
+                JOIN platforms p ON p.id = r.platform_id
+                LEFT JOIN hotel_platform_accounts hpa ON hpa.id = r.hotel_platform_account_id
+                WHERE r.id = CAST(:review_id AS uuid)
+                """
+            ),
+            {"review_id": review_id},
+        ).mappings().one_or_none()
+        return dict(result) if result else None
+
     @staticmethod
     def _build_review_query_parts(
         *,
@@ -311,6 +336,58 @@ class ReviewRepository:
             },
         )
         return int(result.scalar_one())
+
+    def delete_reviews(
+        self,
+        *,
+        hotel_id: str,
+        platform_id: str,
+        hotel_platform_account_id: str | None = None,
+    ) -> int:
+        filters = [
+            "hotel_id = CAST(:hotel_id AS uuid)",
+            "platform_id = CAST(:platform_id AS uuid)",
+        ]
+        params: dict[str, Any] = {
+            "hotel_id": hotel_id,
+            "platform_id": platform_id,
+        }
+
+        if hotel_platform_account_id is not None:
+            filters.append(
+                "hotel_platform_account_id = CAST(:hotel_platform_account_id AS uuid)"
+            )
+            params["hotel_platform_account_id"] = hotel_platform_account_id
+
+        where_clause = " AND ".join(filters)
+        result = self.db.execute(
+            text(
+                f"""
+                DELETE FROM reviews
+                WHERE {where_clause}
+                RETURNING id
+                """
+            ),
+            params,
+        )
+        return len(result.fetchall())
+
+    def delete_review_by_id(
+        self,
+        *,
+        review_id: str,
+    ) -> int:
+        result = self.db.execute(
+            text(
+                """
+                DELETE FROM reviews
+                WHERE id = CAST(:review_id AS uuid)
+                RETURNING id
+                """
+            ),
+            {"review_id": review_id},
+        )
+        return len(result.fetchall())
 
     def list_review_stats(
         self,

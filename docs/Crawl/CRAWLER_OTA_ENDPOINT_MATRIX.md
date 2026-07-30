@@ -218,6 +218,14 @@ He thong hien tai dang cho luu them:
 - `expedia`
 - `ctrip`
 
+`ctrip` hien tai da co the post review qua:
+
+- `POST /api/v1/sync/reviews/ctrip`
+
+`expedia` hien tai da co the post review qua:
+
+- `POST /api/v1/sync/reviews/expedia`
+
 Neu sau nay co luong crawl cho cac nen tang nay thi van dung:
 
 - `GET /api/v1/hotels?limit=200&offset=0`

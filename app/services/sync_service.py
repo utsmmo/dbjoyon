@@ -39,8 +39,11 @@ class ReviewSyncService:
         if hotel is None:
             raise ValueError(f"Hotel not found: {payload.hotel_id}")
 
+        resolved_source_link = None
+        resolved_hotel_platform_account = None
+
         if payload.source_link_used:
-            normalized_source_link = normalize_source_link(
+            resolved_source_link = normalize_source_link(
                 platform_code,
                 payload.source_link_used,
             )
@@ -50,20 +53,62 @@ class ReviewSyncService:
             normalized_source_links = [
                 normalize_source_link(platform_code, link) for link in source_links
             ]
-            if normalized_source_link not in normalized_source_links:
+            if resolved_source_link not in normalized_source_links:
                 raise ValueError(
                     "source_link_used is not registered for this hotel and platform"
                 )
+            resolved_hotel_platform_account = (
+                self.hotel_repository.get_hotel_platform_account_by_external_id(
+                    hotel_id=payload.hotel_id,
+                    platform_id=platform["id"],
+                    external_account_id=resolved_source_link,
+                )
+            )
+            if resolved_hotel_platform_account is None:
+                raise ValueError(
+                    "source_link_used is registered on hotel metadata but missing hotel_platform_account"
+                )
+
+        if payload.hotel_platform_account_id:
+            provided_hotel_platform_account = (
+                self.hotel_repository.get_hotel_platform_account_by_id(
+                    hotel_platform_account_id=str(payload.hotel_platform_account_id),
+                    hotel_id=payload.hotel_id,
+                    platform_id=platform["id"],
+                )
+            )
+            if provided_hotel_platform_account is None:
+                raise ValueError(
+                    "hotel_platform_account_id does not belong to this hotel and platform"
+                )
+            if (
+                resolved_hotel_platform_account is not None
+                and provided_hotel_platform_account["id"]
+                != resolved_hotel_platform_account["id"]
+            ):
+                raise ValueError(
+                    "hotel_platform_account_id does not match source_link_used"
+                )
+            resolved_hotel_platform_account = provided_hotel_platform_account
+
+        resolved_hotel_platform_account_id = (
+            resolved_hotel_platform_account["id"]
+            if resolved_hotel_platform_account is not None
+            else None
+        )
 
         mapper = get_review_mapper(platform_code)
+        request_payload = payload.model_dump(mode="json")
+        request_payload["hotel_platform_account_id"] = resolved_hotel_platform_account_id
+        request_payload["source_link_used"] = resolved_source_link
         sync_job_id = self.sync_job_repository.create_job(
             job_type="review_sync",
             target_type="reviews",
             hotel_id=payload.hotel_id,
             platform_id=platform["id"],
-            hotel_platform_account_id=payload.hotel_platform_account_id,
+            hotel_platform_account_id=resolved_hotel_platform_account_id,
             triggered_by=payload.triggered_by,
-            request_payload=payload.model_dump(mode="json"),
+            request_payload=request_payload,
         )
 
         inserted = 0
@@ -85,7 +130,7 @@ class ReviewSyncService:
                 self.review_metric_repository.upsert_current_metrics(
                     hotel_id=payload.hotel_id,
                     platform_id=platform["id"],
-                    hotel_platform_account_id=payload.hotel_platform_account_id,
+                    hotel_platform_account_id=resolved_hotel_platform_account_id,
                     source_total_reviews=payload.source_total_reviews,
                     source_average_rating=payload.source_average_rating,
                     source_rating_scale=payload.source_rating_scale,
@@ -101,7 +146,7 @@ class ReviewSyncService:
                 self.review_category_repository.upsert_category_snapshot(
                     hotel_id=payload.hotel_id,
                     platform_id=platform["id"],
-                    hotel_platform_account_id=payload.hotel_platform_account_id,
+                    hotel_platform_account_id=resolved_hotel_platform_account_id,
                     source_captured_at=payload.source_captured_at.isoformat()
                     if payload.source_captured_at
                     else None,
@@ -115,11 +160,15 @@ class ReviewSyncService:
 
             for item in payload.reviews:
                 normalized_review = mapper.normalize(item)
-                normalized_review = self.translation_service.enrich_review_translation(normalized_review)
+                normalized_review = (
+                    self.translation_service.enrich_review_translation(
+                        normalized_review
+                    )
+                )
                 upserted = self.review_repository.upsert_review(
                     hotel_id=payload.hotel_id,
                     platform_id=platform["id"],
-                    hotel_platform_account_id=payload.hotel_platform_account_id,
+                    hotel_platform_account_id=resolved_hotel_platform_account_id,
                     review=normalized_review,
                 )
 
@@ -133,11 +182,14 @@ class ReviewSyncService:
                         hotel_id=payload.hotel_id,
                         review_id=upserted["id"],
                         title=f"Bad review detected from {platform_code}",
-                        description=normalized_review.get("review_text") or normalized_review.get("review_title"),
+                        description=normalized_review.get("review_text")
+                        or normalized_review.get("review_title"),
                         metadata={
                             "severity": "high",
                             "platform_code": platform_code,
-                            "external_review_id": normalized_review["external_review_id"],
+                            "external_review_id": normalized_review[
+                                "external_review_id"
+                            ],
                             "triggered_by": payload.triggered_by,
                         },
                     )
@@ -162,23 +214,24 @@ class ReviewSyncService:
                 records_updated=updated,
                 response_payload={
                     "platform_code": platform_code,
-                        "fetched": len(payload.reviews),
-                        "inserted": inserted,
-                        "updated": updated,
-                        "incidents_opened": incidents_opened,
-                        "source_total_reviews": payload.source_total_reviews,
-                        "source_average_rating": payload.source_average_rating,
-                        "source_rating_scale": payload.source_rating_scale,
-                        "source_review_url": payload.source_review_url,
-                        "source_link_used": payload.source_link_used,
-                        "source_captured_at": payload.source_captured_at.isoformat()
-                        if payload.source_captured_at
-                        else None,
-                        "estimated_new_reviews_from_source": estimated_new_reviews_from_source,
-                        "stored_total_reviews_before_sync": stored_total_reviews_before_sync,
-                        "stored_total_reviews_after_sync": stored_total_reviews_after_sync,
-                    },
-                )
+                    "fetched": len(payload.reviews),
+                    "inserted": inserted,
+                    "updated": updated,
+                    "incidents_opened": incidents_opened,
+                    "source_total_reviews": payload.source_total_reviews,
+                    "source_average_rating": payload.source_average_rating,
+                    "source_rating_scale": payload.source_rating_scale,
+                    "source_review_url": payload.source_review_url,
+                    "source_link_used": resolved_source_link,
+                    "hotel_platform_account_id": resolved_hotel_platform_account_id,
+                    "source_captured_at": payload.source_captured_at.isoformat()
+                    if payload.source_captured_at
+                    else None,
+                    "estimated_new_reviews_from_source": estimated_new_reviews_from_source,
+                    "stored_total_reviews_before_sync": stored_total_reviews_before_sync,
+                    "stored_total_reviews_after_sync": stored_total_reviews_after_sync,
+                },
+            )
             self.db.commit()
         except Exception as exc:
             self.sync_job_repository.finish_job(

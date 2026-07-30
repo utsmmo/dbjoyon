@@ -1,13 +1,37 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import logging
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.deps import db_session
-from app.schemas.review import ReviewListResponse, ReviewStatsListResponse
+from app.db.session import SessionLocal
+from app.schemas.review import (
+    ReviewDeleteResponse,
+    ReviewListResponse,
+    ReviewStatsListResponse,
+)
+from app.services.review_admin_service import ReviewAdminService
+from app.services.review_analytics_maintenance_service import (
+    ReviewAnalyticsMaintenanceService,
+)
 from app.services.review_query_service import ReviewQueryService
 
 router = APIRouter(tags=["reviews"])
+logger = logging.getLogger(__name__)
+
+
+def _rebuild_dashboard_analytics_background() -> None:
+    db = SessionLocal()
+    try:
+        ReviewAnalyticsMaintenanceService(db).rebuild_dashboard_analytics()
+        db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception("Background rebuild_dashboard_analytics failed after review delete")
+    finally:
+        db.close()
 
 
 @router.get("/reviews", response_model=ReviewListResponse)
@@ -104,3 +128,26 @@ def list_review_stats(
         hotel_id=hotel_id,
         platform_code=platform_code,
     )
+
+
+@router.delete("/reviews", response_model=ReviewDeleteResponse)
+def delete_reviews(
+    background_tasks: BackgroundTasks,
+    review_id: str | None = Query(default=None),
+    hotel_id: str | None = Query(default=None),
+    platform_code: str | None = Query(default=None),
+    source_link: str | None = Query(default=None),
+    db: Session = Depends(db_session),
+) -> ReviewDeleteResponse:
+    service = ReviewAdminService(db)
+    try:
+        response = service.delete_reviews(
+            review_id=review_id,
+            hotel_id=hotel_id,
+            platform_code=platform_code,
+            source_link=source_link,
+        )
+        background_tasks.add_task(_rebuild_dashboard_analytics_background)
+        return response
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

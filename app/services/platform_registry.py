@@ -1,12 +1,16 @@
 from app.services.platforms.agoda import AgodaReviewMapper
 from app.services.platforms.base import BaseReviewMapper
 from app.services.platforms.booking import BookingReviewMapper
+from app.services.platforms.ctrip import CtripReviewMapper
+from app.services.platforms.expedia import ExpediaReviewMapper
 from app.services.platforms.google import GoogleReviewMapper
 from app.services.platforms.tripadvisor import TripadvisorReviewMapper
 
 PLATFORM_MAPPERS: dict[str, type[BaseReviewMapper]] = {
     "booking": BookingReviewMapper,
     "agoda": AgodaReviewMapper,
+    "ctrip": CtripReviewMapper,
+    "expedia": ExpediaReviewMapper,
     "tripadvisor": TripadvisorReviewMapper,
     "google": GoogleReviewMapper,
 }

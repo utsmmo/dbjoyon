@@ -119,3 +119,25 @@ class ReviewMetricRepository:
             params,
         )
         return [dict(row) for row in result.mappings().all()]
+
+    def delete_current_metrics(
+        self,
+        *,
+        hotel_id: str,
+        platform_id: str,
+    ) -> int:
+        result = self.db.execute(
+            text(
+                """
+                DELETE FROM hotel_platform_review_metrics
+                WHERE hotel_id = CAST(:hotel_id AS uuid)
+                  AND platform_id = CAST(:platform_id AS uuid)
+                RETURNING hotel_id
+                """
+            ),
+            {
+                "hotel_id": hotel_id,
+                "platform_id": platform_id,
+            },
+        )
+        return len(result.fetchall())

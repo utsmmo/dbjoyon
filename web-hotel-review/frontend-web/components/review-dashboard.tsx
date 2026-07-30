@@ -89,6 +89,7 @@ type DashboardIconName =
 const DEFAULT_FILTERS: DashboardFilters = {
   hotelId: "",
   platformCode: "",
+  sourceLink: "",
   reviewerCountryCode: "",
   ratingMin: "",
   ratingMax: "",
@@ -161,7 +162,7 @@ function buildReviewFlagSummary(flags: ReviewFlagFilter[]) {
     .join(" + ");
 }
 
-function enforceBadReviewMode(filters: DashboardFilters, mode: "dashboard" | "reviews"): DashboardFilters {
+function enforceBadReviewMode(filters: DashboardFilters, mode: "review" | "reviews"): DashboardFilters {
   if (mode !== "reviews") {
     return filters;
   }
@@ -180,6 +181,7 @@ function isDefaultDashboardFilters(filters: DashboardFilters) {
   return (
     filters.hotelId === "" &&
     filters.platformCode === "" &&
+    filters.sourceLink === "" &&
     filters.reviewerCountryCode === "" &&
     filters.ratingMin === "" &&
     filters.ratingMax === "" &&
@@ -196,6 +198,7 @@ function areFiltersEqual(left: DashboardFilters, right: DashboardFilters) {
   return (
     left.hotelId === right.hotelId &&
     left.platformCode === right.platformCode &&
+    left.sourceLink === right.sourceLink &&
     left.reviewerCountryCode === right.reviewerCountryCode &&
     left.ratingMin === right.ratingMin &&
     left.ratingMax === right.ratingMax &&
@@ -228,6 +231,24 @@ async function fetchReviewPage(filters: DashboardFilters, page = 1, limit = CLIE
   });
   if (!response.ok) throw new Error((await response.text()) || "Failed to load reviews.");
   return (await response.json()) as PaginatedResponse<Review>;
+}
+
+async function fetchAllReviewMatches(filters: DashboardFilters) {
+  const items: Review[] = [];
+  let page = 1;
+
+  while (true) {
+    const dataset = await fetchReviewPage(filters, page, 200);
+    items.push(...dataset.items);
+
+    if (items.length >= dataset.total || dataset.items.length === 0) {
+      break;
+    }
+
+    page += 1;
+  }
+
+  return items;
 }
 
 async function fetchReviewAnalytics(filters: DashboardFilters) {
@@ -364,6 +385,16 @@ function formatIsoDateForDisplay(value: string) {
   }
 
   return `${day}/${month}/${year}`;
+}
+
+function summarizeSourceLink(link: string) {
+  try {
+    const url = new URL(link);
+    const cleanedPath = url.pathname.length > 36 ? `${url.pathname.slice(0, 36)}...` : url.pathname;
+    return `${url.hostname}${cleanedPath}`;
+  } catch {
+    return link.length > 48 ? `${link.slice(0, 48)}...` : link;
+  }
 }
 
 function DateTextControl({
@@ -996,12 +1027,12 @@ function buildReviewMixFromBuckets(buckets: DashboardAnalyticsResponse["score_bu
       return;
     }
 
-    if (bucket.rating_from >= 8) {
+    if (bucket.rating_from >= 9) {
       segments[0].count += bucket.review_count;
       return;
     }
 
-    if (bucket.rating_from >= 6) {
+    if (bucket.rating_from >= 7) {
       segments[1].count += bucket.review_count;
       return;
     }
@@ -1091,17 +1122,19 @@ function DonutChart({
 }
 
 export function ReviewDashboard({
-  mode = "dashboard",
+  mode = "review",
 }: {
-  mode?: "dashboard" | "reviews";
+  mode?: "review" | "reviews";
 }) {
   const hotelsCacheRef = useRef<CacheEntry<PaginatedResponse<Hotel>> | null>(null);
   const reviewPageCacheRef = useRef<Map<string, CacheEntry<PaginatedResponse<Review>>>>(new Map());
+  const reviewUniverseCacheRef = useRef<Map<string, CacheEntry<Review[]>>>(new Map());
   const analyticsCacheRef = useRef<Map<string, CacheEntry<DashboardAnalyticsResponse>>>(new Map());
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [filterSeedReviews, setFilterSeedReviews] = useState<Review[]>([]);
   const [platformFilterOptions, setPlatformFilterOptions] = useState<{ label: string; value: string }[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewUniverse, setReviewUniverse] = useState<Review[]>([]);
   const [analytics, setAnalytics] = useState<DashboardAnalyticsResponse | null>(null);
   const [reviewCategories, setReviewCategories] = useState<ReviewCategoryCurrentSummary[]>([]);
   const [totalMatches, setTotalMatches] = useState(0);
@@ -1136,6 +1169,15 @@ export function ReviewDashboard({
     setIsAnalyticsLoading(true);
   }
 
+  function applyImmediateFilters(nextFilters: DashboardFilters) {
+    const nextEffectiveFilters = enforceBadReviewMode(nextFilters, mode);
+    const nextFilterKey = buildDashboardCacheKey(nextEffectiveFilters);
+
+    beginDatasetRefresh(nextFilterKey);
+    setDraftFilters(nextFilters);
+    setFilters(nextFilters);
+  }
+
   const deferredSearch = useDeferredValue(filters.q);
   const effectiveFilters = useMemo(
     () => enforceBadReviewMode(filters, mode),
@@ -1149,6 +1191,7 @@ export function ReviewDashboard({
     () => ({
       hotelId: effectiveFilters.hotelId,
       platformCode: effectiveFilters.platformCode,
+      sourceLink: effectiveFilters.sourceLink,
       reviewerCountryCode: effectiveFilters.reviewerCountryCode,
       ratingMin: effectiveFilters.ratingMin,
       ratingMax: effectiveFilters.ratingMax,
@@ -1166,6 +1209,7 @@ export function ReviewDashboard({
       effectiveFilters.dateTo,
       effectiveFilters.hotelId,
       effectiveFilters.platformCode,
+      effectiveFilters.sourceLink,
       effectiveFilters.ratingMax,
       effectiveFilters.ratingMin,
       effectiveFilters.reviewerCountryCode,
@@ -1263,6 +1307,53 @@ export function ReviewDashboard({
       isActive = false;
     };
   }, [apiFilters, currentPage, filterSeedReviews.length, pendingFilterKey]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (appliedReviewFlags.length === 0) {
+      setReviewUniverse([]);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    const cacheKey = `${buildDashboardCacheKey(apiFilters)}::all`;
+    const cachedUniverse = reviewUniverseCacheRef.current.get(cacheKey);
+
+    if (cachedUniverse && cachedUniverse.expiresAt > Date.now()) {
+      setReviewUniverse(cachedUniverse.data);
+      return () => {
+        isActive = false;
+      };
+    }
+
+    setIsLoading(true);
+
+    fetchAllReviewMatches(apiFilters)
+      .then((items) => {
+        if (!isActive) return;
+        reviewUniverseCacheRef.current.set(cacheKey, {
+          data: items,
+          expiresAt: Date.now() + CLIENT_CACHE_TTL_MS,
+        });
+        setReviewUniverse(items);
+      })
+      .catch((loadError) => {
+        if (!isActive) return;
+        setError((current) => current || (loadError instanceof Error ? loadError.message : "Failed to load filtered reviews."));
+        setReviewUniverse([]);
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [apiFilters, appliedReviewFlags]);
 
   useEffect(() => {
     let isActive = true;
@@ -1404,18 +1495,19 @@ export function ReviewDashboard({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [tableLanguageFilters, tableScoreFilters]);
+  }, [appliedReviewFlags, apiFilters, tableLanguageFilters, tableScoreFilters]);
 
+  const flagFilterBaseReviews = appliedReviewFlags.length > 0 ? reviewUniverse : reviews;
   const filteredReviews = useMemo(
     () =>
-      reviews.filter((review) => {
+      flagFilterBaseReviews.filter((review) => {
         if (appliedReviewFlags.length === 0) {
           return true;
         }
 
         return appliedReviewFlags.includes(getReviewScoreBucket(review));
       }),
-    [appliedReviewFlags, reviews],
+    [appliedReviewFlags, flagFilterBaseReviews],
   );
   const tableLanguageOptions = useMemo(
     () =>
@@ -1504,9 +1596,17 @@ export function ReviewDashboard({
   const insightNotes = useMemo(() => buildInsightNotes(filteredReviews), [filteredReviews]);
 
   const totalPages = Math.max(Math.ceil(totalMatches / CLIENT_PAGE_SIZE), 1);
-  const pagedReviews = tableFilteredReviews;
+  const filteredTotalPages = Math.max(Math.ceil(tableFilteredReviews.length / CLIENT_PAGE_SIZE), 1);
+  const pagedReviews = useMemo(() => {
+    if (appliedReviewFlags.length === 0) {
+      return tableFilteredReviews;
+    }
+
+    const startIndex = Math.max(currentPage - 1, 0) * CLIENT_PAGE_SIZE;
+    return tableFilteredReviews.slice(startIndex, startIndex + CLIENT_PAGE_SIZE);
+  }, [appliedReviewFlags.length, currentPage, tableFilteredReviews]);
   const selectedReview =
-    tableFilteredReviews.find((review) => review.id === selectedReviewId) || tableFilteredReviews[0] || null;
+    pagedReviews.find((review) => review.id === selectedReviewId) || pagedReviews[0] || null;
 
   useEffect(() => {
     let isActive = true;
@@ -1586,6 +1686,94 @@ export function ReviewDashboard({
     () => [{ label: "All hotels", value: "" }, ...hotels.map((hotel) => ({ label: hotel.hotel_name, value: hotel.id }))],
     [hotels],
   );
+  const selectedPlatformCodes = useMemo(
+    () => parsePlatformFilterValue(effectiveDraftFilters.platformCode),
+    [effectiveDraftFilters.platformCode],
+  );
+  const configuredHotelsInViewCount = useMemo(() => {
+    const selectedHotelId = effectiveFilters.hotelId;
+    if (selectedHotelId) {
+      return hotels.some((hotel) => hotel.id === selectedHotelId) ? 1 : 0;
+    }
+
+    if (selectedPlatformCodes.length === 0) {
+      return hotels.length;
+    }
+
+    return hotels.filter((hotel) => {
+      const sourceLinks =
+        typeof hotel.metadata === "object" && hotel.metadata !== null && "source_links" in hotel.metadata
+          ? (hotel.metadata.source_links as Record<string, string[] | undefined>)
+          : {};
+
+      return selectedPlatformCodes.some((platformCode) => (sourceLinks?.[platformCode] ?? []).length > 0);
+    }).length;
+  }, [effectiveFilters.hotelId, hotels, selectedPlatformCodes]);
+  const sourceLinkOptions = useMemo(() => {
+    if (selectedPlatformCodes.length !== 1) {
+      return [{ label: "Select one OTA first", value: "" }];
+    }
+
+    const selectedPlatform = selectedPlatformCodes[0];
+    const relevantHotels = effectiveDraftFilters.hotelId
+      ? hotels.filter((hotel) => hotel.id === effectiveDraftFilters.hotelId)
+      : hotels;
+
+    const items = relevantHotels.flatMap((hotel) => {
+      const sourceLinks =
+        typeof hotel.metadata === "object" && hotel.metadata !== null && "source_links" in hotel.metadata
+          ? (hotel.metadata.source_links as Record<string, string[] | undefined>)
+          : {};
+      const links = sourceLinks?.[selectedPlatform] ?? [];
+
+      return links.map((link, index) => ({
+        label:
+          relevantHotels.length === 1
+            ? `Link ${index + 1} · ${summarizeSourceLink(link)}`
+            : `${hotel.hotel_name} · Link ${index + 1} · ${summarizeSourceLink(link)}`,
+        value: link,
+      }));
+    });
+
+    const deduped = items.filter(
+      (item, index, array) => array.findIndex((candidate) => candidate.value === item.value) === index,
+    );
+
+    return [
+      {
+        label: `All ${selectedPlatform.toUpperCase()} links`,
+        value: "",
+      },
+      ...deduped,
+    ];
+  }, [effectiveDraftFilters.hotelId, hotels, selectedPlatformCodes]);
+  const configuredPlatformOptions = useMemo(() => {
+    const relevantHotels = effectiveDraftFilters.hotelId
+      ? hotels.filter((hotel) => hotel.id === effectiveDraftFilters.hotelId)
+      : hotels;
+
+    const platforms = new Set<string>();
+
+    relevantHotels.forEach((hotel) => {
+      const sourceLinks =
+        typeof hotel.metadata === "object" && hotel.metadata !== null && "source_links" in hotel.metadata
+          ? (hotel.metadata.source_links as Record<string, string[] | undefined>)
+          : {};
+
+      Object.entries(sourceLinks).forEach(([platformCode, links]) => {
+        if ((links ?? []).length > 0) {
+          platforms.add(platformCode);
+        }
+      });
+    });
+
+    return [...platforms]
+      .sort((left, right) => left.localeCompare(right))
+      .map((platform) => ({
+        label: String(platform).charAt(0).toUpperCase() + String(platform).slice(1).toLowerCase(),
+        value: platform,
+      }));
+  }, [effectiveDraftFilters.hotelId, hotels]);
   const analyticsPlatformOptions = useMemo(
     () =>
       [...new Set((analytics?.hotel_breakdown ?? []).map((item) => item.platform_code).filter(Boolean))].map(
@@ -1597,16 +1785,12 @@ export function ReviewDashboard({
     [analytics],
   );
   const platformOptions = useMemo(() => {
-    if (platformFilterOptions.length > 0) {
-      return platformFilterOptions;
-    }
+    const mergedOptions = [...configuredPlatformOptions, ...platformFilterOptions, ...analyticsPlatformOptions];
 
-    return analyticsPlatformOptions;
-  }, [analyticsPlatformOptions, platformFilterOptions]);
-  const selectedPlatformCodes = useMemo(
-    () => parsePlatformFilterValue(effectiveDraftFilters.platformCode),
-    [effectiveDraftFilters.platformCode],
-  );
+    return mergedOptions.filter(
+      (option, index, array) => array.findIndex((candidate) => candidate.value === option.value) === index,
+    );
+  }, [analyticsPlatformOptions, configuredPlatformOptions, platformFilterOptions]);
   useEffect(() => {
     const availablePlatforms = new Set(platformOptions.map((option) => option.value));
     const nextSelectedPlatforms = selectedPlatformCodes.filter((code) => availablePlatforms.has(code));
@@ -1620,6 +1804,17 @@ export function ReviewDashboard({
       platformCode: nextSelectedPlatforms.join(","),
     }));
   }, [platformOptions, selectedPlatformCodes]);
+  useEffect(() => {
+    const availableLinks = new Set(sourceLinkOptions.map((option) => option.value));
+    if (availableLinks.has(effectiveDraftFilters.sourceLink)) {
+      return;
+    }
+
+    setDraftFilters((current) => ({
+      ...current,
+      sourceLink: "",
+    }));
+  }, [effectiveDraftFilters.sourceLink, sourceLinkOptions]);
   const appliedReviewFlagSummary = useMemo(
     () => buildReviewFlagSummary(appliedReviewFlags),
     [appliedReviewFlags],
@@ -1650,6 +1845,10 @@ export function ReviewDashboard({
         return false;
       }
 
+      if (effectiveDraftFilters.sourceLink && review.source_link_used !== effectiveDraftFilters.sourceLink) {
+        return false;
+      }
+
       if (effectiveDraftFilters.badOnly && !review.is_bad_review) {
         return false;
       }
@@ -1659,6 +1858,7 @@ export function ReviewDashboard({
   }, [
     effectiveDraftFilters.badOnly,
     effectiveDraftFilters.hotelId,
+    effectiveDraftFilters.sourceLink,
     filterSeedReviews,
     reviews,
     selectedPlatformCodes,
@@ -1702,7 +1902,7 @@ export function ReviewDashboard({
     : summaryBlockedByUnsupportedFilters
       ? null
       : summary?.avg_rating ?? null;
-  const displayTotalPages = useFilteredAnalytics ? 1 : totalPages;
+  const displayTotalPages = useFilteredAnalytics ? filteredTotalPages : totalPages;
   const analyticsSupportMessage = analytics
     ? buildAnalyticsSupportMessage(unsupportedAnalyticsFilters)
     : "Loading analytics...";
@@ -1881,7 +2081,7 @@ export function ReviewDashboard({
         ? "Updating reviews..."
         : "Updating dashboard..."
       : `${displayTotalMatches} reviews matched`;
-  const showMetricSkeleton = mode === "dashboard" && isLoading && !hasReviewData;
+  const showMetricSkeleton = mode === "review" && isLoading && !hasReviewData;
   const activeCategorySummary = useMemo(() => {
     if (reviewCategories.length === 0) {
       return null;
@@ -1965,7 +2165,7 @@ export function ReviewDashboard({
       title={pageTitle}
       subtitle={pageSubtitle}
       statusLabel={statusLabel}
-      showHeaderActions={mode !== "dashboard"}
+      showHeaderActions={mode !== "review"}
     >
       {mode === "reviews" ? (
               <>
@@ -2081,6 +2281,7 @@ export function ReviewDashboard({
                           setDraftFilters((current) => ({
                             ...current,
                             platformCode: item.label === "unknown" ? "" : item.label,
+                            sourceLink: "",
                           }))
                         }
                         className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-medium capitalize text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
@@ -2107,13 +2308,24 @@ export function ReviewDashboard({
                       </FilterField>
                     </div>
                     <FilterField label="Hotel">
-                      <SelectControl value={draftFilters.hotelId} onChange={(value) => setDraftFilters((current) => ({ ...current, hotelId: value }))} options={hotelOptions} />
+                      <SelectControl
+                        value={draftFilters.hotelId}
+                        onChange={(value) => applyImmediateFilters({ ...draftFilters, hotelId: value, sourceLink: "" })}
+                        options={hotelOptions}
+                      />
                     </FilterField>
                     <FilterField label="OTA (single)">
                       <SourceCheckboxGroup
                         value={draftFilters.platformCode}
-                        onChange={(value) => setDraftFilters((current) => ({ ...current, platformCode: value }))}
+                        onChange={(value) => applyImmediateFilters({ ...draftFilters, platformCode: value, sourceLink: "" })}
                         options={platformOptions}
+                      />
+                    </FilterField>
+                    <FilterField label="OTA link">
+                      <SelectControl
+                        value={draftFilters.sourceLink}
+                        onChange={(value) => applyImmediateFilters({ ...draftFilters, sourceLink: value })}
+                        options={sourceLinkOptions}
                       />
                     </FilterField>
                     <FilterField label="Guest country">
@@ -2382,7 +2594,7 @@ export function ReviewDashboard({
               </>
       ) : null}
 
-      <div className={mode === "dashboard" ? "space-y-6" : "hidden"}>
+      <div className={mode === "review" ? "space-y-6" : "hidden"}>
       <section className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
               {showMetricSkeleton ? (
                 <>
@@ -2431,7 +2643,7 @@ export function ReviewDashboard({
                           canShowAggregateBreakdowns
                             ? useFilteredAnalytics
                               ? String(filteredAnalyticsHotelCounts.length)
-                              : String(hotelCounts.length)
+                              : String(configuredHotelsInViewCount)
                             : "-"
                         }
                         helper={
@@ -2440,7 +2652,7 @@ export function ReviewDashboard({
                             : useFilteredAnalytics
                               ? `Based on the current ${appliedReviewFlagSummary} review set.`
                               : analyticsSupportsFullDashboard
-                                ? "Distinct hotels in the aggregate dataset."
+                                ? "Configured hotels that match the current hotel and OTA filters."
                                 : "Needs analytics filters that support aggregate hotel breakdowns."
                         }
                         tone="text-emerald-600"
@@ -2516,8 +2728,8 @@ export function ReviewDashboard({
                     type="button"
                     onClick={() => {
                       beginDatasetRefresh(buildDashboardCacheKey(DEFAULT_FILTERS));
-                      setDraftFilters(DEFAULT_FILTERS);
-                      setFilters(DEFAULT_FILTERS);
+                        setDraftFilters(DEFAULT_FILTERS);
+                        setFilters(DEFAULT_FILTERS);
                       setDraftReviewFlags([]);
                       setAppliedReviewFlags([]);
                       setTableScoreFilters([]);
@@ -2532,13 +2744,24 @@ export function ReviewDashboard({
             >
               <div className="grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1.35fr)_minmax(0,0.82fr)_minmax(0,0.82fr)_minmax(0,1fr)_minmax(0,0.95fr)_minmax(0,0.95fr)] xl:items-end">
                 <FilterField label="Hotel">
-                  <SelectControl value={draftFilters.hotelId} onChange={(value) => setDraftFilters((current) => ({ ...current, hotelId: value }))} options={hotelOptions} />
+                  <SelectControl
+                    value={draftFilters.hotelId}
+                    onChange={(value) => applyImmediateFilters({ ...draftFilters, hotelId: value, sourceLink: "" })}
+                    options={hotelOptions}
+                  />
                 </FilterField>
                 <FilterField label="OTA (single)">
                   <SourceCheckboxGroup
                     value={draftFilters.platformCode}
-                    onChange={(value) => setDraftFilters((current) => ({ ...current, platformCode: value }))}
+                    onChange={(value) => applyImmediateFilters({ ...draftFilters, platformCode: value, sourceLink: "" })}
                     options={platformOptions}
+                  />
+                </FilterField>
+                <FilterField label="OTA link">
+                  <SelectControl
+                    value={draftFilters.sourceLink}
+                    onChange={(value) => applyImmediateFilters({ ...draftFilters, sourceLink: value })}
+                    options={sourceLinkOptions}
                   />
                 </FilterField>
                 <FilterField label="Min rating">

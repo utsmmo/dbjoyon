@@ -4,6 +4,7 @@ INSERT INTO platforms (platform_code, platform_name, platform_type, is_active, m
 VALUES
     ('booking', 'Booking.com', 'review', TRUE, '{"source":"seed"}'::JSONB),
     ('agoda', 'Agoda', 'review', TRUE, '{"source":"seed"}'::JSONB),
+    ('ctrip', 'Ctrip', 'review', TRUE, '{"source":"seed"}'::JSONB),
     ('tripadvisor', 'Tripadvisor', 'review', TRUE, '{"source":"seed"}'::JSONB),
     ('google', 'Google Reviews', 'review', TRUE, '{"source":"seed"}'::JSONB)
 ON CONFLICT (platform_code) DO UPDATE

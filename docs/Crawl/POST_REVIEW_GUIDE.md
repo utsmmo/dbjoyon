@@ -74,6 +74,8 @@ Crawler chi duoc dung cac endpoint sau:
 - `GET /api/v1/reviews/stats?hotel_id=<hotel_id>&platform_code=<platform_code>`
 - `GET /api/v1/reviews?hotel_id=<hotel_id>&platform_code=<platform_code>&limit=20&offset=0`
 - `POST /api/v1/sync/reviews/{platform_code}`
+- `DELETE /api/v1/reviews?hotel_id=<hotel_id>&platform_code=<platform_code>`
+- `DELETE /api/v1/reviews?hotel_id=<hotel_id>&platform_code=<platform_code>&source_link=<canonical_link>`
 - `GET /api/v1/reviews/bad/unnotified`
 - `POST /api/v1/notifications/deliveries`
 
@@ -163,6 +165,8 @@ Hien tai ho tro:
 
 - `booking`
 - `agoda`
+- `ctrip`
+- `expedia`
 - `tripadvisor`
 - `google`
 
@@ -170,6 +174,8 @@ Vi du:
 
 - `POST https://data.datac.click/api/v1/sync/reviews/booking`
 - `POST https://data.datac.click/api/v1/sync/reviews/agoda`
+- `POST https://data.datac.click/api/v1/sync/reviews/ctrip`
+- `POST https://data.datac.click/api/v1/sync/reviews/expedia`
 - `POST https://data.datac.click/api/v1/sync/reviews/google`
 
 ## 6. Payload post review chuan
@@ -180,6 +186,7 @@ Vi du:
 - `reviews[]`
 - `reviews[].external_review_id`
 - `reviews[].reviewed_at`
+- `reviews[].reviewer_country_code`
 - `reviews[].raw_payload`
 
 ### Field nen co
@@ -195,6 +202,37 @@ Vi du:
 - `reviews[].reviewer_country_code`
 - `reviews[].source_created_at`
 - `reviews[].source_updated_at`
+
+### Rule validation moi
+
+Tu ngay `July 29, 2026`, backend se tu choi payload neu thieu:
+
+- `reviews[].reviewer_country_code`
+
+Va field nay phai dung format:
+
+- ma quoc gia `2 ky tu`
+- vi du: `US`, `VN`, `KR`, `AU`
+
+Neu crawler chua resolve duoc quoc gia reviewer, khong duoc post review do vao backend.
+
+### Khuyen nghi production
+
+De tranh `500`, `502`, `ReadTimeout` va giam rui ro sync fail, crawler nen mac dinh dung payload toi gian:
+
+- `hotel_id`
+- `source_link_used`
+- `triggered_by`
+- `reviews[].external_review_id`
+- `reviews[].reviewed_at`
+- `reviews[].reviewer_country_code`
+- `reviews[].raw_payload`
+
+Chi gui them cac field mo rong nhu `hotel_platform_account_id`, `source_total_reviews`, `source_categories`, `review_text`, `rating`, `reviewer_*` khi da xac nhan backend lane do on dinh cho batch hien tai.
+
+`hotel_platform_account_id` la field de fail nhat neu mapping sai. Neu crawler khong lay duoc UUID chinh xac tu he thong, hay bo trong field nay.
+
+Neu crawler gui dung `source_link_used`, backend se tu resolve `hotel_platform_account_id` theo link da dang ky cua hotel. Chi gui ca hai field khi chac chan chung cung tro toi mot account.
 
 ### Payload mau
 
@@ -232,6 +270,27 @@ Vi du:
         "id": "booking-review-001",
         "title": "Good stay",
         "text": "Nice room and clean area."
+      }
+    }
+  ]
+}
+```
+
+### Payload toi gian de sync an toan
+
+```json
+{
+  "hotel_id": "6681d663-38ae-4896-a24b-4bcb7b091346",
+  "source_link_used": "https://www.booking.com/Share-97t5jDA",
+  "triggered_by": "crawler_booking_v1",
+  "reviews": [
+    {
+      "external_review_id": "booking-review-001",
+      "reviewed_at": "2026-07-29T09:00:00+07:00",
+      "reviewer_country_code": "VN",
+      "raw_payload": {
+        "provider": "booking",
+        "id": "booking-review-001"
       }
     }
   ]
@@ -306,7 +365,42 @@ curl "https://data.datac.click/api/v1/reviews/stats?hotel_id=hotel-uuid-1&platfo
 curl "https://data.datac.click/api/v1/reviews?hotel_id=hotel-uuid-1&platform_code=booking&limit=20&offset=0"
 ```
 
-## 10. Cach phan biet dung va sai
+## 10. Endpoint xoa review theo OTA de lam sach du lieu
+
+Day la endpoint backend noi bo, dung khi Admin / DB / crawl duoc phep lam sach du lieu sai.
+
+### Xoa tat ca review cua 1 hotel + 1 OTA
+
+```bash
+curl -X DELETE "https://data.datac.click/api/v1/reviews?hotel_id=<hotel_id>&platform_code=booking"
+```
+
+### Xoa review cua 1 hotel + 1 OTA + 1 link cu the
+
+```bash
+curl -X DELETE "https://data.datac.click/api/v1/reviews?hotel_id=<hotel_id>&platform_code=booking&source_link=<canonical_link>"
+```
+
+### Rule dung endpoint xoa
+
+- `hotel_id` la bat buoc
+- `platform_code` la bat buoc
+- `source_link` la tuy chon
+- neu khong co `source_link`: xoa toan bo review cua OTA do trong hotel do
+- neu co `source_link`: chi xoa review gan voi link do
+- chi dung khi da co lenh ro rang tu Admin / DB / Leader
+- khong duoc tu dong goi endpoint nay trong crawl flow hang ngay
+
+### Xoa 1 review theo review_id
+
+```bash
+curl -X DELETE "https://data.datac.click/api/v1/reviews?review_id=<review_id>"
+```
+
+- dung khi can xoa rieng 1 dong review test
+- neu da truyen `review_id` thi khong can `hotel_id` va `platform_code`
+
+## 11. Cach phan biet dung va sai
 
 ### Dung
 
@@ -326,7 +420,7 @@ curl "https://data.datac.click/api/v1/reviews?hotel_id=hotel-uuid-1&platform_cod
 - tu sua link hotel trong database
 - goi endpoint reset/import cua admin
 
-## 11. Neu gap du lieu sai
+## 12. Neu gap du lieu sai
 
 Neu crawler gap mot trong cac tinh huong sau:
 
@@ -346,7 +440,7 @@ Thi xu ly dung la:
    - link nghi sai
 3. tam thoi khong tu sua DB
 
-## 12. Checklist truoc khi ban giao cho doi crawl
+## 13. Checklist truoc khi ban giao cho doi crawl
 
 1. Da doc `docs/Crawl/CRAWLER_OTA_ENDPOINT_MATRIX.md`
 2. Da doc file nay
