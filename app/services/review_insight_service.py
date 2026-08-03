@@ -54,6 +54,10 @@ class ReviewInsightService:
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "JoyON-Review-AI/1.0",
+                "Origin": "https://data.datac.click",
+                "Referer": "https://data.datac.click/",
             },
         )
 
