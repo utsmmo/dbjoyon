@@ -202,15 +202,18 @@ class ChannexWebhookService:
         authorization: str,
         response_mode: str,
     ) -> dict[str, Any]:
-        runtime = self._get_runtime_config()
-
         if not booking_id.strip():
             raise ChannexWebhookError(code="missing_booking_id", status_code=400)
 
-        resolved_authorization = authorization.strip() or runtime["channex_bearer_token"]
+        runtime = self._get_runtime_config()
+        resolved_authorization = authorization.strip()
 
         if not resolved_authorization:
-            raise ChannexWebhookError(code="missing_authorization_header", status_code=400)
+            raise ChannexWebhookError(
+                code="missing_authorization_header",
+                status_code=400,
+                detail="Pass Channex Bearer token in the Authorization header.",
+            )
 
         if not resolved_authorization.lower().startswith("bearer "):
             resolved_authorization = f"Bearer {resolved_authorization}"
