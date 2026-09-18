@@ -173,27 +173,12 @@
           "phone": ""
         },
         "whatsapp": {
-          "enabled": true,
+          "enabled": false,
           "account_name": "SG1 WhatsApp",
           "account_id": "",
-          "phone": "84869888171"
+          "phone": ""
         }
       }
-    }
-  },
-  "shared_accounts": {
-    "sale": {
-      "zalo": [
-        "0866888171",
-        "0342077770"
-      ],
-      "whatsapp": []
-    },
-    "accounting": {
-      "zalo": [
-        "0903144314"
-      ],
-      "whatsapp": []
     }
   }
 }
