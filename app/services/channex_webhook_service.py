@@ -277,6 +277,7 @@ class ChannexWebhookService:
             "hotel_name": hotel.get("hotel_name"),
             "ota_name": ota_display_name,
             "reservation_id": self._pick_string(attributes.get("unique_id")),
+            "ota_reservation_id": self._pick_string(attributes.get("ota_reservation_code")),
             "ota_reservation_code": self._pick_string(attributes.get("ota_reservation_code")),
             "channel_id": self._pick_string(attributes.get("channel_id")),
             "revision_id": self._pick_string(attributes.get("revision_id")),
