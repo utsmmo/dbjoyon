@@ -1,0 +1,199 @@
+{
+  "properties": {
+    "803a397e-36cc-4e57-9d64-68899ef6f6a2": {
+      "hotel_code": "DN1",
+      "hotel_name": "Danang Beach Hotel",
+      "chat_accounts": {
+        "zalo": {
+          "enabled": true,
+          "account_name": "DN1 Zalo",
+          "account_id": "",
+          "phone": "0869778789"
+        },
+        "whatsapp": {
+          "enabled": true,
+          "account_name": "DN1 WhatsApp",
+          "account_id": "",
+          "phone": "84869778789"
+        }
+      }
+    },
+    "7990604f-6cfb-4819-9516-db7ee08c2a73": {
+      "hotel_code": "DN2",
+      "hotel_name": "Ania Villa",
+      "chat_accounts": {
+        "zalo": {
+          "enabled": true,
+          "account_name": "DN2 Zalo",
+          "account_id": "",
+          "phone": "0347033330"
+        },
+        "whatsapp": {
+          "enabled": true,
+          "account_name": "DN2 WhatsApp",
+          "account_id": "",
+          "phone": "84347033330"
+        }
+      }
+    },
+    "cae6e555-1624-4e7f-8948-4c96d5ecc270": {
+      "hotel_code": "DN3",
+      "hotel_name": "The Grace",
+      "chat_accounts": {
+        "zalo": {
+          "enabled": true,
+          "account_name": "DN3 Zalo",
+          "account_id": "",
+          "phone": "0869000343"
+        },
+        "whatsapp": {
+          "enabled": true,
+          "account_name": "DN3 WhatsApp",
+          "account_id": "",
+          "phone": "84869000343"
+        }
+      }
+    },
+    "f8d6d87a-3747-45ea-b8b8-cd799042dda2": {
+      "hotel_code": "HA3",
+      "hotel_name": "Beachfront Hotel Hoi An",
+      "chat_accounts": {
+        "zalo": {
+          "enabled": true,
+          "account_name": "HA3 Zalo",
+          "account_id": "",
+          "phone": "0368016000"
+        },
+        "whatsapp": {
+          "enabled": true,
+          "account_name": "HA3 WhatsApp",
+          "account_id": "",
+          "phone": "84337666373"
+        }
+      }
+    },
+    "c443f51f-3959-4244-a898-375f36a9e9e5": {
+      "hotel_code": "HA5",
+      "hotel_name": "Sala Hoian Hotel",
+      "chat_accounts": {
+        "zalo": {
+          "enabled": true,
+          "account_name": "HA5 Zalo",
+          "account_id": "",
+          "phone": "0905787373"
+        },
+        "whatsapp": {
+          "enabled": true,
+          "account_name": "HA5 WhatsApp",
+          "account_id": "",
+          "phone": "84905787373"
+        }
+      }
+    },
+    "b9da283a-181d-4a0c-9bb4-f92a94b21b22": {
+      "hotel_code": "HA6",
+      "hotel_name": "Old Town Hotel",
+      "chat_accounts": {
+        "zalo": {
+          "enabled": true,
+          "account_name": "HA6 Zalo",
+          "account_id": "",
+          "phone": "0865392909"
+        },
+        "whatsapp": {
+          "enabled": true,
+          "account_name": "HA6 WhatsApp",
+          "account_id": "",
+          "phone": "84394033330"
+        }
+      }
+    },
+    "6e97cb45-8c53-4422-8e65-2ef1d89ac8f5": {
+      "hotel_code": "HA7",
+      "hotel_name": "Eco hoian Hotel",
+      "chat_accounts": {
+        "zalo": {
+          "enabled": true,
+          "account_name": "HA7 Zalo",
+          "account_id": "",
+          "phone": "0961932532"
+        },
+        "whatsapp": {
+          "enabled": true,
+          "account_name": "HA7 WhatsApp",
+          "account_id": "",
+          "phone": "84961932532"
+        }
+      }
+    },
+    "87ff5181-44d2-4e6c-8671-5208b896d070": {
+      "hotel_code": "HA8",
+      "hotel_name": "La Alba Villa",
+      "chat_accounts": {
+        "zalo": {
+          "enabled": true,
+          "account_name": "HA8 Zalo",
+          "account_id": "",
+          "phone": "0363171617"
+        },
+        "whatsapp": {
+          "enabled": true,
+          "account_name": "HA8 WhatsApp",
+          "account_id": "",
+          "phone": ""
+        }
+      }
+    },
+    "672ad5b5-f165-45de-a8a2-8cc87a449c5f": {
+      "hotel_code": "HA9",
+      "hotel_name": "Southern Hotel",
+      "chat_accounts": {
+        "zalo": {
+          "enabled": true,
+          "account_name": "HA9 Zalo",
+          "account_id": "",
+          "phone": "0328801279"
+        },
+        "whatsapp": {
+          "enabled": true,
+          "account_name": "HA9 WhatsApp",
+          "account_id": "",
+          "phone": "84328801279"
+        }
+      }
+    },
+    "799ee0b4-bd00-480f-a9b8-4c768366abcc": {
+      "hotel_code": "SG1",
+      "hotel_name": "SLIVIN SG",
+      "chat_accounts": {
+        "zalo": {
+          "enabled": true,
+          "account_name": "SG1 Zalo",
+          "account_id": "",
+          "phone": ""
+        },
+        "whatsapp": {
+          "enabled": true,
+          "account_name": "SG1 WhatsApp",
+          "account_id": "",
+          "phone": "84869888171"
+        }
+      }
+    }
+  },
+  "shared_accounts": {
+    "sale": {
+      "zalo": [
+        "0866888171",
+        "0342077770"
+      ],
+      "whatsapp": []
+    },
+    "accounting": {
+      "zalo": [
+        "0903144314"
+      ],
+      "whatsapp": []
+    }
+  }
+}

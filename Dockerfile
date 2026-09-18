@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY ops ./ops
+COPY hotelmap.json ./hotelmap.json
 
 EXPOSE 8000
 
