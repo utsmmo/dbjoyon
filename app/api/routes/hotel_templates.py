@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Form, HTTPException
+from fastapi import APIRouter, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
 router = APIRouter(prefix="/hotel-templates", tags=["hotel-templates"])
@@ -93,65 +93,104 @@ def _page_shell(title: str, body: str) -> str:
     a {{ color: #1f6b4f; font-weight: 700; }}
     table {{ width: 100%; border-collapse: collapse; }}
     th, td {{ text-align: left; border-bottom: 1px solid #e7ddc7; padding: 12px 8px; vertical-align: top; }}
+    .layout {{ display: grid; grid-template-columns: 320px 1fr; gap: 18px; align-items: start; }}
     .row {{ display: grid; grid-template-columns: 1fr 180px; gap: 16px; }}
     .create-row {{ display: grid; grid-template-columns: 160px 1fr 120px; gap: 12px; align-items: end; }}
     .hint {{ color: #776b58; font-size: 14px; margin-top: 10px; }}
     .actions a {{ margin-right: 12px; }}
+    .template-link {{ display: block; padding: 10px 12px; border-radius: 12px; text-decoration: none; }}
+    .template-link.active {{ background: #e8ddc3; }}
+    @media (max-width: 860px) {{ .layout, .row, .create-row {{ grid-template-columns: 1fr; }} }}
   </style>
 </head>
 <body><main>{body}</main></body>
 </html>"""
 
 
-@router.get("/", response_class=HTMLResponse)
-def list_hotel_templates() -> str:
-    rows = []
+def _list_templates() -> list[dict[str, str]]:
+    templates: list[dict[str, str]] = []
     for path in sorted(_template_dir().glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             continue
         code = _safe_hotel_code(str(data.get("hotel_code") or path.stem))
-        property_name = str(data.get("property_name") or "")
-        language = str(data.get("language") or "en")
-        rows.append(
-            "<tr>"
-            f"<td><strong>{html.escape(code)}</strong></td>"
-            f"<td>{html.escape(property_name)}</td>"
-            f"<td>{html.escape(language)}</td>"
-            f"<td class=\"actions\"><a href=\"/hotel-templates/{html.escape(code)}/edit\">Edit</a>"
-            f"<a href=\"/hotel-templates/{html.escape(code)}.json\">JSON</a></td>"
-            "</tr>"
+        templates.append(
+            {
+                "code": code,
+                "property_name": str(data.get("property_name") or ""),
+                "language": str(data.get("language") or "en"),
+            }
         )
-    table_rows = "\n".join(rows) or "<tr><td colspan=\"4\">No templates yet.</td></tr>"
+    return templates
+
+
+@router.get("/", response_class=HTMLResponse)
+def list_hotel_templates(code: str | None = Query(default=None)) -> str:
+    templates = _list_templates()
+    selected_code = _safe_hotel_code(code) if code else (templates[0]["code"] if templates else "")
+    selected_data: dict[str, Any] | None = None
+    if selected_code:
+        selected_data = _read_template(selected_code)
+
+    links = []
+    for item in templates:
+        is_active = item["code"] == selected_code
+        class_name = "template-link active" if is_active else "template-link"
+        links.append(
+            f"<a class=\"{class_name}\" href=\"/hotel-templates/?code={html.escape(item['code'])}\">"
+            f"<strong>{html.escape(item['code'])}</strong><br>{html.escape(item['property_name'])}"
+            "</a>"
+        )
+    template_links = "\n".join(links) or "<div class=\"hint\">No templates yet.</div>"
+
+    editor = "<div class=\"hint\">Create a template first, then edit it here.</div>"
+    if selected_data is not None:
+        property_name = str(selected_data.get("property_name") or "")
+        language = str(selected_data.get("language") or "en")
+        template = str(selected_data.get("template") or "")
+        editor = f"""
+        <form method="post" action="/hotel-templates/{html.escape(selected_code)}/edit">
+          <h2>Edit: {html.escape(selected_code)}</h2>
+          <div class="row">
+            <div>
+              <label>Property Name</label>
+              <input name="property_name" value="{html.escape(property_name)}" />
+            </div>
+            <div>
+              <label>Language</label>
+              <input name="language" value="{html.escape(language)}" />
+            </div>
+          </div>
+          <label>Template Text</label>
+          <textarea name="template">{html.escape(template)}</textarea>
+          <button type="submit">Save Template</button>
+          <div class="hint">JSON link: <a href="/hotel-templates/{html.escape(selected_code)}.json">/hotel-templates/{html.escape(selected_code)}.json</a></div>
+        </form>
+        """
+
     body = f"""
     <section class="card">
       <h1>Hotel Templates</h1>
-      <div class="hint">Create/edit templates here. Each hotel code automatically has a JSON link like <code>/hotel-templates/DN2.json</code>.</div>
+      <div class="hint">Tất cả thêm/sửa template nằm ở trang này. Link JSON vẫn dùng dạng <code>/hotel-templates/DN2.json</code>.</div>
     </section>
-    <section class="card">
-      <h2>Add New Template</h2>
-      <form method="post" action="/hotel-templates/">
-        <div class="create-row">
-          <div>
-            <label>Hotel Code</label>
-            <input name="hotel_code" placeholder="DN2" required />
-          </div>
-          <div>
-            <label>Property Name</label>
-            <input name="property_name" placeholder="Ania Villa" required />
-          </div>
+    <div class="layout">
+      <aside class="card">
+        <h2>Add New Template</h2>
+        <form method="post" action="/hotel-templates/">
+          <label>Hotel Code</label>
+          <input name="hotel_code" placeholder="DN2" required />
+          <label>Property Name</label>
+          <input name="property_name" placeholder="Ania Villa" required />
           <button type="submit">Create</button>
-        </div>
-      </form>
-    </section>
-    <section class="card">
-      <h2>Existing Templates</h2>
-      <table>
-        <thead><tr><th>Code</th><th>Property</th><th>Language</th><th>Links</th></tr></thead>
-        <tbody>{table_rows}</tbody>
-      </table>
-    </section>
+        </form>
+        <h2 style="margin-top: 24px;">Existing Templates</h2>
+        {template_links}
+      </aside>
+      <section class="card">
+        {editor}
+      </section>
+    </div>
     """
     return _page_shell("Hotel Templates", body)
 
@@ -172,7 +211,7 @@ def create_hotel_template(
         template=DEFAULT_TEMPLATE.replace("(Property Name)", property_name.strip() or "(Property Name)"),
     )
     return f"""<!doctype html>
-<html><head><meta charset="utf-8" /><meta http-equiv="refresh" content="0; url=/hotel-templates/{html.escape(code)}/edit" />
+<html><head><meta charset="utf-8" /><meta http-equiv="refresh" content="0; url=/hotel-templates/?code={html.escape(code)}" />
 <title>Created</title></head><body>Created.</body></html>"""
 
 
@@ -221,5 +260,5 @@ def save_hotel_template(
     code = _safe_hotel_code(hotel_code)
     _write_template(hotel_code=code, property_name=property_name, language=language, template=template)
     return f"""<!doctype html>
-<html><head><meta charset="utf-8" /><meta http-equiv="refresh" content="1; url=/hotel-templates/{html.escape(code)}/edit" />
+<html><head><meta charset="utf-8" /><meta http-equiv="refresh" content="0; url=/hotel-templates/?code={html.escape(code)}" />
 <title>Saved</title></head><body style="font-family: sans-serif; padding: 32px;">Saved. Returning to editor...</body></html>"""
