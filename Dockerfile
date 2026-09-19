@@ -16,6 +16,7 @@ COPY app ./app
 COPY ops ./ops
 COPY env.channex ./env.channex
 COPY hotelmap.json ./hotelmap.json
+COPY hotel_templates ./hotel_templates
 
 EXPOSE 8000
 

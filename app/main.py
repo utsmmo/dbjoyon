@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.api.routes.channex_webhook import router as channex_webhook_router
 from app.api.routes.health import router as health_router
+from app.api.routes.hotel_templates import router as hotel_templates_router
 from app.api.routes.google_sheets import router as google_sheets_router
 from app.api.routes.access_admin import router as access_admin_router
 from app.api.routes.admin_settings import router as admin_settings_router
@@ -25,6 +26,7 @@ app = FastAPI(
 )
 
 app.include_router(health_router)
+app.include_router(hotel_templates_router)
 app.include_router(channex_webhook_router, prefix="/api/v1")
 app.include_router(hotels_router, prefix="/api/v1")
 app.include_router(access_admin_router, prefix="/api/v1")
@@ -53,4 +55,5 @@ def root() -> dict[str, str]:
 @app.on_event("shutdown")
 def shutdown_event() -> None:
     dispose_engine()
+
 
