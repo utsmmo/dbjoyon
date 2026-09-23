@@ -120,16 +120,16 @@ class NotificationRepository:
                     r.id,
                     r.hotel_id,
                     r.platform_id,
-                    :channel_code,
-                    :event_type,
-                    :delivery_status,
-                    :target_ref,
-                    :external_message_id,
-                    :error_message,
+                    CAST(:channel_code AS varchar),
+                    CAST(:event_type AS varchar),
+                    CAST(:delivery_status AS varchar),
+                    CAST(:target_ref AS varchar),
+                    CAST(:external_message_id AS varchar),
+                    CAST(:error_message AS text),
                     CAST(:request_payload AS jsonb),
                     CAST(:response_payload AS jsonb),
                     CAST(:metadata AS jsonb),
-                    CASE WHEN :delivery_status = 'sent' THEN NOW() ELSE NULL END
+                    CASE WHEN CAST(:delivery_status AS varchar) = 'sent' THEN NOW() ELSE NULL END
                 FROM reviews r
                 WHERE r.id = CAST(:review_id AS uuid)
                 ON CONFLICT (review_id, channel_code, event_type)
