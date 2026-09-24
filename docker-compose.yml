@@ -58,6 +58,7 @@ services:
       - "13000:8000"
     volumes:
       - ./backups:/app/backups
+      - ./hotel_templates:/app/hotel_templates
       - ${RCLONE_CONFIG_HOST_PATH:-./ops/backup/rclone}:/root/.config/rclone:ro
     depends_on:
       postgres:
