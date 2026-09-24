@@ -2,5 +2,5 @@
   "hotel_code": "DN1",
   "property_name": "Danang Beach Hotel",
   "language": "en",
-  "template": "Dear {guest_name},\n\nThank you for choosing {property_name} for your stay. 💛\n\nWe are pleased to confirm your reservation with the following details. Kindly check the information below and let us know if everything is correct.\n\n• Booking Name: {guest_name}\n• Room Type: {room_type}\n• Check-in Date: {check_in_date}\n• Check-out Date: {check_out_date}\n• Number of Guests: {guest_count}\n• Booking Platform: {booking_platform}\n• Reservation ID: {reservation_id}"
+  "template": "Dear {guest_name},\nThank you for choosing {property_name} for your stay in Hoi An. 💛\nWe are pleased to confirm your reservation with the following details. Kindly check the information below and let us know if everything is correct.\n• Booking Name: {guest_name}\n• Room Type: {room_type}\n• Check-in Date: {check_in_date}\n• Check-out Date: {check_out_date}\n• Number of Guests: {guest_count}\n• Booking Platform: {booking_platform}\n• Reservation ID: {reservation_id}"
 }
