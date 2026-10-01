@@ -8,6 +8,7 @@ SUPPORTED_REVIEW_PLATFORMS: dict[str, str] = {
     "expedia": "Expedia",
     "tripadvisor": "Tripadvisor",
     "google": "Google Reviews",
+    "airbnb": "Airbnb",
 }
 
 

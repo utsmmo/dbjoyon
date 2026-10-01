@@ -6,13 +6,14 @@ from sqlalchemy.engine.url import make_url
 
 class Settings(BaseSettings):
     app_env: str = "local"
-    app_version: str = "0.1.10"
+    app_version: str = "0.1.11-channex"
     app_build: str = "local"
     app_host: str = "0.0.0.0"
     app_port: int = 8000
     database_url: str = "postgresql+psycopg://hotel_admin:hotel_admin_123@localhost:15432/hotel_review_db"
     default_timezone: str = "Asia/Bangkok"
-    bad_review_rating_threshold: float = 9.0
+    bad_review_rating_threshold: float = 7.0
+    good_review_rating_threshold: float = 9.0
     translation_provider: str = "disabled"
     google_translate_enabled: bool = False
     google_translate_api_key: str = ""
@@ -34,6 +35,8 @@ class Settings(BaseSettings):
     google_oauth_client_id: str = ""
     google_oauth_client_secret: str = ""
     google_oauth_refresh_token: str = ""
+    lark_bad_review_webhook_url: str = ""
+    lark_notification_timeout_seconds: int = 15
 
     model_config = SettingsConfigDict(
         env_file=".env",

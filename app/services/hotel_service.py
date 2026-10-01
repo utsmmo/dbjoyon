@@ -18,6 +18,7 @@ from app.schemas.hotel_admin import (
 )
 from app.schemas.hotel import HotelCreateRequest, HotelListResponse, HotelResponse
 from app.services.link_normalizer import normalize_source_links
+from app.services.review_analytics_maintenance_service import ReviewAnalyticsMaintenanceService
 
 
 class HotelService:
@@ -25,6 +26,7 @@ class HotelService:
         self.db = db
         self.hotel_repository = HotelRepository(db)
         self.platform_repository = PlatformRepository(db)
+        self.analytics_maintenance_service = ReviewAnalyticsMaintenanceService(db)
 
     def create_hotel(self, payload: HotelCreateRequest) -> HotelResponse:
         if payload.status not in {"active", "inactive"}:
@@ -67,6 +69,7 @@ class HotelService:
 
         try:
             deleted_hotels = self.hotel_repository.delete_all_hotels()
+            self.analytics_maintenance_service.rebuild_dashboard_analytics()
             self.db.commit()
             return HotelPurgeResponse(
                 deleted_hotels=deleted_hotels,
@@ -90,6 +93,7 @@ class HotelService:
             deleted_hotels, imported_items, imported_accounts = self._replace_hotels(
                 payload.hotels
             )
+            self.analytics_maintenance_service.rebuild_dashboard_analytics()
             self.db.commit()
             return HotelResetImportResponse(
                 deleted_hotels=deleted_hotels,
@@ -186,6 +190,7 @@ class HotelService:
             deleted = self.hotel_repository.delete_hotel(hotel_id=hotel_id)
             if not deleted:
                 raise ValueError("hotel not found")
+            self.analytics_maintenance_service.rebuild_dashboard_analytics()
             self.db.commit()
             return HotelDeleteResponse(
                 deleted_hotel_id=hotel_id,

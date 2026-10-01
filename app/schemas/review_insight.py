@@ -8,7 +8,7 @@ class InsightReviewItem(BaseModel):
     rating: float | None = None
     rating_scale: float | None = None
     reviewed_at: str
-    is_bad_review: bool
+    review_status: str
     title: str
     body: str
 

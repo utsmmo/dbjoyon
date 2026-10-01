@@ -8,7 +8,8 @@ Muc tieu la de doi crawl doc dung 3 file, lay dung link, map dung `hotel_id`, va
 1. `docs/Crawl/CRAWLER_DOC_START_HERE.md`
 2. `docs/Crawl/CRAWLER_OTA_ENDPOINT_MATRIX.md`
 3. `docs/Crawl/POST_REVIEW_GUIDE.md`
-4. `docs/Crawl/ADMIN_CRAWLER_HOTEL_LINK_PLAN.md`
+4. `docs/Crawl/OTA_STANDARDIZATION_RULEBOOK.md`
+5. `docs/Crawl/ADMIN_CRAWLER_HOTEL_LINK_PLAN.md`
 
 ## Nguon su that
 
@@ -16,10 +17,28 @@ Muc tieu la de doi crawl doc dung 3 file, lay dung link, map dung `hotel_id`, va
 - Link OTA chuan: `items[].metadata.source_links`
 - Ten business chuan: `items[].hotel_name`
 - Endpoint post review chuan: `POST /api/v1/sync/reviews/{platform_code}`
+- Endpoint xoa review theo OTA khi duoc phep: `DELETE /api/v1/reviews?hotel_id=...&platform_code=...`
+- Khi doc review tu API, field trang thai chuan la `review_status`
 
 Crawler khong tu tao ten hotel moi theo ten OTA.
 Crawler khong tu sua link hotel trong database.
 Crawler chi doc link va post review.
+
+## Contract moi ve trang thai review
+
+- Khi crawler `POST /api/v1/sync/reviews/{platform_code}`, van co the gui `reviews[].is_bad_review` neu can
+- Backend se tu tinh lai theo rule diem hien tai trong settings
+- Khi crawler / n8n / Lark `GET /api/v1/reviews...` de doc review, phai dung:
+  - `review_status = good`
+  - `review_status = average`
+  - `review_status = bad`
+- Khong duoc tiep tuc parse field response `is_bad_review` o phia crawler nua
+
+Filter moi:
+
+- `GET /api/v1/reviews?review_status=bad`
+- `GET /api/v1/reviews?review_status=average`
+- `GET /api/v1/reviews?review_status=good`
 
 ## Rule rat quan trong
 
@@ -55,6 +74,7 @@ Chi can link dung, `hotel_id` dung, va review post ve dung hotel.
 - `GET /api/v1/reviews/stats`
 - `GET /api/v1/reviews`
 - `POST /api/v1/sync/reviews/{platform_code}`
+- `DELETE /api/v1/reviews?hotel_id=...&platform_code=...`
 - `GET /api/v1/reviews/bad/unnotified`
 - `POST /api/v1/notifications/deliveries`
 
@@ -81,6 +101,7 @@ Neu link sai, hotel sai, trung hotel, hay can sua OTA list:
 6. Da chuan bi `external_review_id` cho moi review
 7. Da biet se post vao `platform_code` nao
 8. Neu co, da gui `source_link_used` dung voi link dang crawl
+9. Da gui `reviews[].reviewer_country_code` cho moi review, dung ma quoc gia 2 ky tu
 
 ## Neu chi doc 1 file
 
@@ -88,3 +109,4 @@ Neu doi crawl chi co it thoi gian, doc file nay truoc, sau do doc ngay:
 
 - `docs/Crawl/CRAWLER_OTA_ENDPOINT_MATRIX.md`
 - `docs/Crawl/POST_REVIEW_GUIDE.md`
+- `docs/Crawl/OTA_STANDARDIZATION_RULEBOOK.md`

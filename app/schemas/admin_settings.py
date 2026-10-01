@@ -28,3 +28,16 @@ class AdminSettingListResponse(BaseModel):
 class AdminSettingUpdateRequest(BaseModel):
     value: str | int | bool | None = Field(default=None)
     updated_by_user_id: str | None = Field(default=None, max_length=64)
+
+
+class AdminAiProviderValidationRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    api_key: str = Field(min_length=1)
+    base_url: str = Field(min_length=1)
+    model: str = Field(min_length=1, max_length=200)
+    timeout_ms: int = Field(ge=1000, le=300000, default=45000)
+
+
+class AdminAiProviderValidationResponse(BaseModel):
+    ok: bool
+    message: str

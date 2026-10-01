@@ -42,6 +42,9 @@ class ReviewRepository:
         hotel_id: str | None,
         platform_code: str | None,
         source_link: str | None,
+        review_status: str | None,
+        average_min: float,
+        good_min: float,
         is_bad_review: bool | None,
         reviewer_country_code: str | None,
         rating_min: float | None,
@@ -75,6 +78,27 @@ class ReviewRepository:
         if source_link:
             filters.append("hpa.external_account_id = :source_link")
             params["source_link"] = source_link
+        if review_status:
+            normalized_statuses = [
+                item.strip().lower()
+                for item in review_status.split(",")
+                if item.strip()
+            ]
+            status_filters: list[str] = []
+            if "bad" in normalized_statuses:
+                status_filters.append(
+                    "((r.rating IS NOT NULL AND r.rating < :average_min) OR (r.rating IS NULL AND r.is_bad_review = TRUE))"
+                )
+            if "average" in normalized_statuses:
+                status_filters.append(
+                    "r.rating IS NOT NULL AND r.rating >= :average_min AND r.rating < :good_min"
+                )
+            if "good" in normalized_statuses:
+                status_filters.append("r.rating IS NOT NULL AND r.rating >= :good_min")
+            if status_filters:
+                filters.append(f"({' OR '.join(status_filters)})")
+            params["average_min"] = average_min
+            params["good_min"] = good_min
         if is_bad_review is not None:
             filters.append("r.is_bad_review = :is_bad_review")
             params["is_bad_review"] = is_bad_review
@@ -220,6 +244,9 @@ class ReviewRepository:
         hotel_id: str | None,
         platform_code: str | None,
         source_link: str | None,
+        review_status: str | None,
+        average_min: float,
+        good_min: float,
         is_bad_review: bool | None,
         reviewer_country_code: str | None,
         rating_min: float | None,
@@ -244,6 +271,9 @@ class ReviewRepository:
             hotel_id=hotel_id,
             platform_code=platform_code,
             source_link=source_link,
+            review_status=review_status,
+            average_min=average_min,
+            good_min=good_min,
             is_bad_review=is_bad_review,
             reviewer_country_code=reviewer_country_code,
             rating_min=rating_min,

@@ -12,6 +12,7 @@ Nguon su that la code; khi route doi, hay sinh lai file nay.
 | POST | `/api/v1/hotels` | `app.api.routes.hotels.create_hotel` | `HotelResponse` | hotels |
 | GET | `/api/v1/incidents` | `app.api.routes.incidents.list_incidents` | `IncidentListResponse` | incidents |
 | POST | `/api/v1/notifications/deliveries` | `app.api.routes.notifications.upsert_notification_delivery` | `NotificationDeliveryUpsertResponse` | notifications |
+| POST | `/api/v1/notifications/lark/bad-reviews/send` | `app.api.routes.notifications.send_bad_reviews_to_lark` | `LarkBadReviewSendResponse` | notifications |
 | GET | `/api/v1/review-categories/current` | `app.api.routes.review_categories.list_current_review_categories` | `ReviewCategoryCurrentListResponse` | review-categories |
 | GET | `/api/v1/review-metrics/current` | `app.api.routes.review_metrics.list_current_review_metrics` | `ReviewMetricListResponse` | review-metrics |
 | GET | `/api/v1/reviews` | `app.api.routes.reviews.list_reviews` | `ReviewListResponse` | reviews |
@@ -105,6 +106,48 @@ Trang thai hien tai:
 - Query params: -
 - Path params: -
 - Body params: -
+
+### `POST /api/v1/notifications/lark/bad-reviews/send`
+
+- Handler: `app.api.routes.notifications.send_bad_reviews_to_lark`
+- Response: `LarkBadReviewSendResponse`
+- Tags: notifications
+- Query params: -
+- Path params: -
+- Body params: -
+
+Goi endpoint nay khi muon backend tu:
+
+- lay 1 bad review cu the theo `review_id`
+- hoac lay queue `unnotified`
+- gui qua Lark webhook
+- va tu dong mark `sent` / `failed`
+
+Payload mau gui 1 review ngay:
+
+```json
+{
+  "review_id": "0231d60e-4fef-4e62-aa8e-d13d8a329071",
+  "target_ref": "ops-review-room"
+}
+```
+
+Payload mau gui batch tu queue:
+
+```json
+{
+  "hotel_id": "50293641-ef69-44df-a0ba-0d9bc9cf58e7",
+  "platform_code": "booking",
+  "limit": 10,
+  "target_ref": "ops-review-room"
+}
+```
+
+Luu y:
+
+- neu khong truyen `webhook_url`, backend se dung `LARK_BAD_REVIEW_WEBHOOK_URL`
+- endpoint nay chi gui `bad review`
+- moi item gui xong se duoc ghi vao `notification_deliveries`
 
 ### `GET /api/v1/review-categories/current`
 
@@ -212,6 +255,15 @@ Trang thai hien tai:
 - Tags: sync
 - Query params: -
 - Path params: platform_code
+- Body params: -
+
+### `DELETE /api/v1/reviews`
+
+- Handler: `app.api.routes.reviews.delete_reviews`
+- Response: `ReviewDeleteResponse`
+- Tags: reviews
+- Query params: review_id, hotel_id, platform_code, source_link
+- Path params: -
 - Body params: -
 
 ### `GET /api/v1/system/backup/config`

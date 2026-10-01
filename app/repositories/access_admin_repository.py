@@ -85,6 +85,43 @@ class AccessAdminRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    def authenticate_user(self, *, email: str, password: str) -> dict[str, Any] | None:
+        result = self.db.execute(
+            text(
+                """
+                SELECT id::text AS id
+                FROM users
+                WHERE LOWER(email) = LOWER(:email)
+                  AND is_active = TRUE
+                  AND password_hash = crypt(:password, password_hash)
+                LIMIT 1
+                """
+            ),
+            {"email": email.strip(), "password": password},
+        )
+        user_id = result.scalar()
+        if not user_id:
+            return None
+        return self.get_user(user_id=user_id)
+
+    def get_user_permission_codes(self, *, user_id: str) -> list[str]:
+        result = self.db.execute(
+            text(
+                """
+                SELECT DISTINCT p.code
+                FROM user_roles ur
+                JOIN roles r ON r.id = ur.role_id
+                JOIN role_permissions rp ON rp.role_id = r.id
+                JOIN permissions p ON p.id = rp.permission_id
+                WHERE ur.user_id = CAST(:user_id AS uuid)
+                  AND r.is_active = TRUE
+                ORDER BY p.code ASC
+                """
+            ),
+            {"user_id": user_id},
+        )
+        return [row["code"] for row in result.mappings().all()]
+
     def ensure_access_baseline(self) -> None:
         for permission in DEFAULT_PERMISSION_DEFINITIONS:
             self.db.execute(

@@ -6,6 +6,7 @@ from app.api.routes.hotel_templates import router as hotel_templates_router
 from app.api.routes.google_sheets import router as google_sheets_router
 from app.api.routes.access_admin import router as access_admin_router
 from app.api.routes.admin_settings import router as admin_settings_router
+from app.api.routes.admin_chatbot import router as admin_chatbot_router
 from app.api.routes.hotels import router as hotels_router
 from app.api.routes.incidents import router as incidents_router
 from app.api.routes.notifications import router as notifications_router
@@ -31,6 +32,7 @@ app.include_router(channex_webhook_router, prefix="/api/v1")
 app.include_router(hotels_router, prefix="/api/v1")
 app.include_router(access_admin_router, prefix="/api/v1")
 app.include_router(admin_settings_router, prefix="/api/v1")
+app.include_router(admin_chatbot_router, prefix="/api/v1")
 app.include_router(google_sheets_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
 app.include_router(reviews_router, prefix="/api/v1")
@@ -55,5 +57,3 @@ def root() -> dict[str, str]:
 @app.on_event("shutdown")
 def shutdown_event() -> None:
     dispose_engine()
-
-

@@ -65,3 +65,13 @@ class UserListResponse(BaseModel):
     total: int
     limit: int
     offset: int
+
+
+class AuthLoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=1, max_length=255)
+
+
+class AuthSessionResponse(BaseModel):
+    user: UserResponse
+    permission_codes: list[str] = Field(default_factory=list)

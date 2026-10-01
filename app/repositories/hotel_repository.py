@@ -166,6 +166,68 @@ class HotelRepository:
         )
         return dict(result.mappings().one())
 
+    def get_hotel_platform_account_by_id(
+        self,
+        *,
+        hotel_platform_account_id: str,
+        hotel_id: str,
+        platform_id: str,
+    ) -> dict[str, Any] | None:
+        result = self.db.execute(
+            text(
+                """
+                SELECT
+                    id::text AS id,
+                    hotel_id::text AS hotel_id,
+                    platform_id::text AS platform_id,
+                    external_account_id,
+                    display_name
+                FROM hotel_platform_accounts
+                WHERE id = CAST(:hotel_platform_account_id AS uuid)
+                  AND hotel_id = CAST(:hotel_id AS uuid)
+                  AND platform_id = CAST(:platform_id AS uuid)
+                """
+            ),
+            {
+                "hotel_platform_account_id": hotel_platform_account_id,
+                "hotel_id": hotel_id,
+                "platform_id": platform_id,
+            },
+        )
+        row = result.mappings().first()
+        return dict(row) if row else None
+
+    def get_hotel_platform_account_by_external_id(
+        self,
+        *,
+        hotel_id: str,
+        platform_id: str,
+        external_account_id: str,
+    ) -> dict[str, Any] | None:
+        result = self.db.execute(
+            text(
+                """
+                SELECT
+                    id::text AS id,
+                    hotel_id::text AS hotel_id,
+                    platform_id::text AS platform_id,
+                    external_account_id,
+                    display_name
+                FROM hotel_platform_accounts
+                WHERE hotel_id = CAST(:hotel_id AS uuid)
+                  AND platform_id = CAST(:platform_id AS uuid)
+                  AND external_account_id = :external_account_id
+                """
+            ),
+            {
+                "hotel_id": hotel_id,
+                "platform_id": platform_id,
+                "external_account_id": external_account_id,
+            },
+        )
+        row = result.mappings().first()
+        return dict(row) if row else None
+
     def delete_hotel_platform_accounts(self, *, hotel_id: str) -> int:
         result = self.db.execute(
             text(

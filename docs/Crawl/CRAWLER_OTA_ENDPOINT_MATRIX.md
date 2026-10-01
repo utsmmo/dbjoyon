@@ -39,6 +39,30 @@ Thu tu uu tien:
 - neu link sai, crawler report lai cho admin
 - 1 hotel co nhieu link cung 1 OTA van chi la `1 hotel_id`
 - crawler duoc crawl nhieu link, nhung khong duoc tao nhieu hotel
+- khi doc review tu API, dung field `review_status` thay cho bool response cu
+
+## 2.1 Contract moi cho review status
+
+Khi backend tra review ra ngoai, field trang thai chuan la:
+
+- `review_status`
+
+Gia tri:
+
+- `good`
+- `average`
+- `bad`
+
+Vi du filter:
+
+```http
+GET /api/v1/reviews?hotel_id=<hotel_id>&platform_code=booking&review_status=bad
+```
+
+Ghi nho:
+
+- crawler van co the gui `reviews[].is_bad_review` trong payload sync neu can
+- nhung khi doc review tu backend de verify / notify / retry, phai doc `review_status`
 
 ## 3. Endpoint goc de lay danh sach hotel va links
 
@@ -128,6 +152,12 @@ Sau do doc:
 GET /api/v1/reviews/stats?hotel_id=<hotel_id>&platform_code=booking
 ```
 
+### Check review Booking bad theo contract moi
+
+```http
+GET /api/v1/reviews?hotel_id=<hotel_id>&platform_code=booking&review_status=bad&limit=20&offset=0
+```
+
 ### Upload review Booking
 
 ```http
@@ -169,6 +199,12 @@ Sau do doc:
 GET /api/v1/reviews/stats?hotel_id=<hotel_id>&platform_code=agoda
 ```
 
+### Check review Agoda bad theo contract moi
+
+```http
+GET /api/v1/reviews?hotel_id=<hotel_id>&platform_code=agoda&review_status=bad&limit=20&offset=0
+```
+
 ### Upload review Agoda
 
 ```http
@@ -202,6 +238,12 @@ Sau do doc:
 
 ```http
 GET /api/v1/reviews/stats?hotel_id=<hotel_id>&platform_code=google
+```
+
+### Check review Google bad theo contract moi
+
+```http
+GET /api/v1/reviews?hotel_id=<hotel_id>&platform_code=google&review_status=bad&limit=20&offset=0
 ```
 
 ### Upload review Google
@@ -321,7 +363,7 @@ Lay tu:
    - booking
    - agoda
    - google
-3. Voi moi hotel trong tung OTA:
+3. Với mỗi hotel trong từng OTA:
    - lay `hotel_id`
    - lay danh sach links
 4. Goi `GET /api/v1/reviews/stats?hotel_id=...&platform_code=...`
@@ -341,9 +383,13 @@ Day la bo endpoint toi thieu can gui:
 - `GET https://data.datac.click/api/v1/reviews/stats?hotel_id=<hotel_id>&platform_code=booking`
 - `GET https://data.datac.click/api/v1/reviews/stats?hotel_id=<hotel_id>&platform_code=agoda`
 - `GET https://data.datac.click/api/v1/reviews/stats?hotel_id=<hotel_id>&platform_code=google`
+- `GET https://data.datac.click/api/v1/reviews?hotel_id=<hotel_id>&platform_code=booking&review_status=bad&limit=20&offset=0`
+- `GET https://data.datac.click/api/v1/reviews?hotel_id=<hotel_id>&platform_code=agoda&review_status=bad&limit=20&offset=0`
+- `GET https://data.datac.click/api/v1/reviews?hotel_id=<hotel_id>&platform_code=google&review_status=bad&limit=20&offset=0`
 - `POST https://data.datac.click/api/v1/sync/reviews/booking`
 - `POST https://data.datac.click/api/v1/sync/reviews/agoda`
 - `POST https://data.datac.click/api/v1/sync/reviews/google`
+- `POST https://data.datac.click/api/v1/sync/reviews/airbnb`
 
 ## 8. Endpoint khong duoc dung
 
@@ -388,6 +434,15 @@ const googleHotels = hotels.items
     hotel_code: h.hotel_code,
     hotel_name: h.hotel_name,
     links: h.metadata.source_links.google,
+  }));
+
+const airbnbHotels = hotels.items
+  .filter(h => h.metadata?.source_links?.airbnb?.length)
+  .map(h => ({
+    hotel_id: h.id,
+    hotel_code: h.hotel_code,
+    hotel_name: h.hotel_name,
+    links: h.metadata.source_links.airbnb,
   }));
 ```
 

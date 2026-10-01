@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 REVIEW_AI_DEFAULT_BASE_URL = "https://r7dnyxy.abc-tunnel.us/v1"
 REVIEW_AI_DEFAULT_MODEL = "cx/gpt-5.4-mini-review"
 REVIEW_AI_DEFAULT_TIMEOUT_MS = "45000"
-CHANNEX_DEFAULT_REQUEST_TIMEOUT_SECONDS = "20"
 REVIEW_RATING_DEFAULT_AVERAGE_MIN = "7"
 REVIEW_RATING_DEFAULT_GOOD_MIN = "9"
 CHATBOT_DEFAULT_LANGUAGE = "vi"
@@ -91,79 +90,6 @@ CHATBOT_DEFAULT_BUSINESS_HOURS = json.dumps(
 
 def build_default_setting_definitions() -> list[dict[str, Any]]:
     return [
-        {
-            "setting_key": "integrations.channex_api_base_url",
-            "group_code": "integrations",
-            "label": "Channex API base URL",
-            "description": "Base URL de webhook receiver goi sang Channex bookings API.",
-            "value_text": os.getenv("CHANNEX_API_BASE_URL", ""),
-            "value_type": "url",
-            "is_secret": False,
-            "is_editable": True,
-        },
-        {
-            "setting_key": "integrations.channex_api_key",
-            "group_code": "integrations",
-            "label": "Channex API key",
-            "description": "API key dung de lay chi tiet booking tu Channex sau khi webhook ban trigger.",
-            "value_text": os.getenv("CHANNEX_API_KEY", ""),
-            "value_type": "secret",
-            "is_secret": True,
-            "is_editable": True,
-        },
-        {
-            "setting_key": "integrations.channex_webhook_secret",
-            "group_code": "integrations",
-            "label": "Channex webhook secret",
-            "description": "Secret header X-Channex-Webhook-Secret de xac thuc webhook tu Channex.",
-            "value_text": os.getenv("CHANNEX_WEBHOOK_SECRET", ""),
-            "value_type": "secret",
-            "is_secret": True,
-            "is_editable": True,
-        },
-        {
-            "setting_key": "integrations.channex_request_timeout_seconds",
-            "group_code": "integrations",
-            "label": "Channex request timeout (seconds)",
-            "description": "Timeout cho request webhook bridge goi Channex hoac n8n.",
-            "value_text": os.getenv(
-                "CHANNEX_REQUEST_TIMEOUT_SECONDS",
-                CHANNEX_DEFAULT_REQUEST_TIMEOUT_SECONDS,
-            ),
-            "value_type": "integer",
-            "is_secret": False,
-            "is_editable": True,
-        },
-        {
-            "setting_key": "integrations.channex_n8n_forward_webhook_url",
-            "group_code": "integrations",
-            "label": "Channex n8n forward webhook URL",
-            "description": "Webhook dich de backend day du lieu booking da normalize sang n8n.",
-            "value_text": os.getenv("N8N_FORWARD_WEBHOOK_URL", ""),
-            "value_type": "url",
-            "is_secret": False,
-            "is_editable": True,
-        },
-        {
-            "setting_key": "integrations.channex_n8n_forward_webhook_token",
-            "group_code": "integrations",
-            "label": "Channex n8n forward webhook token",
-            "description": "Token header X-Bridge-Token khi day booking bridge sang n8n.",
-            "value_text": os.getenv("N8N_FORWARD_WEBHOOK_TOKEN", ""),
-            "value_type": "secret",
-            "is_secret": True,
-            "is_editable": True,
-        },
-        {
-            "setting_key": "integrations.channex_booking_channel_map_json",
-            "group_code": "integrations",
-            "label": "Channex booking channel map JSON",
-            "description": "JSON map nguon booking sang destination channel de webhook bridge chuyen tiep.",
-            "value_text": os.getenv("BOOKING_CHANNEL_MAP_JSON", "{}"),
-            "value_type": "json",
-            "is_secret": False,
-            "is_editable": True,
-        },
         {
             "setting_key": "ai.providers_registry",
             "group_code": "ai",
