@@ -20,6 +20,8 @@ class NotificationService:
         event_type: str,
         hotel_id: str | None,
         platform_code: str | None,
+        recent_days: int | None,
+        include_sent: bool,
         limit: int,
         offset: int,
     ) -> UnnotifiedBadReviewListResponse:
@@ -28,6 +30,8 @@ class NotificationService:
             event_type=event_type,
             hotel_id=hotel_id,
             platform_code=platform_code,
+            recent_days=recent_days,
+            include_sent=include_sent,
             limit=limit,
             offset=offset,
         )

@@ -18,6 +18,8 @@ def list_unnotified_bad_reviews(
     event_type: str = Query(default="bad_review", min_length=1, max_length=50),
     hotel_id: str | None = Query(default=None),
     platform_code: str | None = Query(default=None),
+    recent_days: int | None = Query(default=None, ge=1, le=365),
+    include_sent: bool = Query(default=False),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(db_session),
@@ -28,6 +30,8 @@ def list_unnotified_bad_reviews(
         event_type=event_type,
         hotel_id=hotel_id,
         platform_code=platform_code,
+        recent_days=recent_days,
+        include_sent=include_sent,
         limit=limit,
         offset=offset,
     )

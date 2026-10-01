@@ -17,6 +17,8 @@ class NotificationRepository:
         event_type: str,
         hotel_id: str | None,
         platform_code: str | None,
+        recent_days: int | None,
+        include_sent: bool,
         limit: int,
         offset: int,
     ) -> tuple[list[dict[str, Any]], int]:
@@ -34,8 +36,26 @@ class NotificationRepository:
         if platform_code:
             filters.append("p.platform_code = :platform_code")
             params["platform_code"] = platform_code
+        if recent_days:
+            filters.append(
+                "COALESCE(r.reviewed_at, r.source_updated_at, r.created_at) >= "
+                "NOW() - (:recent_days * INTERVAL '1 day')"
+            )
+            params["recent_days"] = recent_days
 
         where_clause = " AND ".join(filters)
+        delivery_filter = ""
+        if not include_sent:
+            delivery_filter = """
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM notification_deliveries nd
+                  WHERE nd.review_id = r.id
+                    AND nd.channel_code = :channel_code
+                    AND nd.event_type = :event_type
+                    AND nd.delivery_status = 'sent'
+              )
+            """
 
         query = text(
             f"""
@@ -67,14 +87,7 @@ class NotificationRepository:
             JOIN hotels h ON h.id = r.hotel_id
             JOIN platforms p ON p.id = r.platform_id
             WHERE {where_clause}
-              AND NOT EXISTS (
-                  SELECT 1
-                  FROM notification_deliveries nd
-                  WHERE nd.review_id = r.id
-                    AND nd.channel_code = :channel_code
-                    AND nd.event_type = :event_type
-                    AND nd.delivery_status = 'sent'
-              )
+              {delivery_filter}
             ORDER BY r.reviewed_at DESC, r.created_at DESC
             LIMIT :limit OFFSET :offset
             """
