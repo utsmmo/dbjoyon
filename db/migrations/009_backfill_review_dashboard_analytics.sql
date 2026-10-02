@@ -203,39 +203,27 @@ bucketed AS (
         n.normalized_rating,
         CASE
             WHEN n.normalized_rating IS NULL THEN 'unrated'
-            WHEN n.normalized_rating < 2 THEN '0_2'
-            WHEN n.normalized_rating < 4 THEN '2_4'
-            WHEN n.normalized_rating < 6 THEN '4_6'
-            WHEN n.normalized_rating < 8 THEN '6_8'
-            WHEN n.normalized_rating < 9 THEN '8_9'
-            ELSE '9_10'
+            WHEN n.normalized_rating >= 9 THEN 'good'
+            WHEN n.normalized_rating >= 7 THEN 'average'
+            ELSE 'bad'
         END AS bucket_code,
         CASE
             WHEN n.normalized_rating IS NULL THEN 'Unrated'
-            WHEN n.normalized_rating < 2 THEN '0.0 - 1.99'
-            WHEN n.normalized_rating < 4 THEN '2.0 - 3.99'
-            WHEN n.normalized_rating < 6 THEN '4.0 - 5.99'
-            WHEN n.normalized_rating < 8 THEN '6.0 - 7.99'
-            WHEN n.normalized_rating < 9 THEN '8.0 - 8.99'
-            ELSE '9.0 - 10.0'
+            WHEN n.normalized_rating >= 9 THEN 'Good'
+            WHEN n.normalized_rating >= 7 THEN 'Average'
+            ELSE 'Bad'
         END AS bucket_label,
         CASE
             WHEN n.normalized_rating IS NULL THEN 0.0
-            WHEN n.normalized_rating < 2 THEN 0.0
-            WHEN n.normalized_rating < 4 THEN 2.0
-            WHEN n.normalized_rating < 6 THEN 4.0
-            WHEN n.normalized_rating < 8 THEN 6.0
-            WHEN n.normalized_rating < 9 THEN 8.0
-            ELSE 9.0
+            WHEN n.normalized_rating >= 9 THEN 9.0
+            WHEN n.normalized_rating >= 7 THEN 7.0
+            ELSE 1.0
         END AS rating_from,
         CASE
             WHEN n.normalized_rating IS NULL THEN 0.0
-            WHEN n.normalized_rating < 2 THEN 1.99
-            WHEN n.normalized_rating < 4 THEN 3.99
-            WHEN n.normalized_rating < 6 THEN 5.99
-            WHEN n.normalized_rating < 8 THEN 7.99
-            WHEN n.normalized_rating < 9 THEN 8.99
-            ELSE 10.0
+            WHEN n.normalized_rating >= 9 THEN 10.0
+            WHEN n.normalized_rating >= 7 THEN 8.0
+            ELSE 6.0
         END AS rating_to
     FROM normalized_reviews n
 )

@@ -26,7 +26,7 @@ class ReviewSummary(TimestampedModel):
     translated_text_vi: str | None = None
     review_language: str | None
     sentiment_label: str | None
-    is_bad_review: bool
+    review_status: str | None = None
     stay_date: date | None
     reviewed_at: datetime
     replied_at: datetime | None

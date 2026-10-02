@@ -73,6 +73,7 @@ Crawler chi duoc dung cac endpoint sau:
 - `GET /api/v1/hotels?q=<keyword>&limit=200&offset=0`
 - `GET /api/v1/reviews/stats?hotel_id=<hotel_id>&platform_code=<platform_code>`
 - `GET /api/v1/reviews?hotel_id=<hotel_id>&platform_code=<platform_code>&limit=20&offset=0`
+- `GET /api/v1/reviews?hotel_id=<hotel_id>&platform_code=<platform_code>&review_status=bad&limit=20&offset=0`
 - `POST /api/v1/sync/reviews/{platform_code}`
 - `DELETE /api/v1/reviews?hotel_id=<hotel_id>&platform_code=<platform_code>`
 - `DELETE /api/v1/reviews?hotel_id=<hotel_id>&platform_code=<platform_code>&source_link=<canonical_link>`
@@ -169,6 +170,7 @@ Hien tai ho tro:
 - `expedia`
 - `tripadvisor`
 - `google`
+- `airbnb`
 
 Vi du:
 
@@ -180,6 +182,38 @@ Vi du:
 
 ## 6. Payload post review chuan
 
+## 6A. Contract trang thai review khi doc nguoc tu API
+
+Tu ngay `August 5, 2026`, response review chuan cua backend dung field:
+
+- `review_status`
+
+Gia tri hop le:
+
+- `good`
+- `average`
+- `bad`
+
+Crawler / n8n / Lark khi doc review tu:
+
+- `GET /api/v1/reviews`
+- `GET /api/v1/reviews/bad`
+- `GET /api/v1/reviews/bad/unnotified`
+
+phai uu tien doc `review_status`, khong duoc phu thuoc vao `is_bad_review` trong response nua.
+
+Filter moi:
+
+- `GET /api/v1/reviews?review_status=bad`
+- `GET /api/v1/reviews?review_status=average`
+- `GET /api/v1/reviews?review_status=good`
+
+Luu y:
+
+- `is_bad_review` van co the xuat hien trong payload crawler gui len backend
+- nhung do la field input / noi bo
+- response contract cho ben ngoai la `review_status`
+
 ### Field bat buoc
 
 - `hotel_id`
@@ -187,6 +221,8 @@ Vi du:
 - `reviews[].external_review_id`
 - `reviews[].reviewed_at`
 - `reviews[].reviewer_country_code`
+  - bắt buộc với: `booking`, `agoda`, `ctrip`, `expedia`, `tripadvisor`
+  - có thể bỏ trống với: `google`, `airbnb`
 - `reviews[].raw_payload`
 
 ### Field nen co
@@ -207,6 +243,7 @@ Vi du:
 
 Tu ngay `July 29, 2026`, backend se tu choi payload neu thieu:
 
+- `source_link_used`
 - `reviews[].reviewer_country_code`
 
 Va field nay phai dung format:
@@ -316,7 +353,108 @@ Neu crawler gui dung `source_link_used`, backend se tu resolve `hotel_platform_a
 | du lieu da normalize | `normalized_payload` |
 | du lieu goc day du | `raw_payload` |
 
-## 8. Cach xu ly khi 1 hotel co nhieu link cung 1 OTA
+## 8. Rule de Categories hien thi dung tren Analytics
+
+Frontend hien tai uu tien doc:
+
+1. `categories[]` da normalize san
+2. neu `categories[]` rong thi doc tu `raw_payload`
+
+De tranh mat Categories tren Analytics, crawler nen gui theo 1 trong 2 cach duoi day.
+
+### Cach A: gui `categories[]` da normalize
+
+Moi item category nen co:
+
+- `category_code`
+- `category_name`
+- `score`
+- `score_scale`
+
+Vi du:
+
+```json
+{
+  "categories": [
+    {
+      "category_code": "cleanliness",
+      "category_name": "Cleanliness",
+      "score": 8.5,
+      "score_scale": 10
+    },
+    {
+      "category_code": "service",
+      "category_name": "Service",
+      "score": 8.8,
+      "score_scale": 10
+    }
+  ]
+}
+```
+
+### Cach B: gui `raw_payload` dung format theo OTA
+
+#### Booking
+
+Frontend da doc duoc:
+
+```json
+{
+  "raw_payload": {
+    "provider": "booking",
+    "items": [
+      { "id": "cleanliness", "name": "Cleanliness", "score": 8.5, "score_scale": 10 },
+      { "id": "service", "name": "Service", "score": 8.8, "score_scale": 10 }
+    ]
+  }
+}
+```
+
+#### Ctrip
+
+Frontend hien tai da map duoc truc tiep tu:
+
+```json
+{
+  "raw_payload": {
+    "provider": "ctrip",
+    "commentRating": {
+      "fullRating": 10,
+      "ratingRoom": 8.5,
+      "ratingRoomShowItem": "Ve sinh",
+      "ratingService": 8.8,
+      "ratingServiceShowItem": "Dich vu",
+      "ratingFacility": 8.3,
+      "ratingFacilityShowItem": "Trang thiet bi",
+      "ratingLocation": 9.3,
+      "ratingLocationShowItem": "Vi tri"
+    }
+  }
+}
+```
+
+Field toi thieu de Ctrip hien duoc Categories:
+
+- `raw_payload.commentRating.fullRating`
+- `raw_payload.commentRating.ratingRoom`
+- `raw_payload.commentRating.ratingService`
+- `raw_payload.commentRating.ratingFacility`
+- `raw_payload.commentRating.ratingLocation`
+
+Field label nen co:
+
+- `raw_payload.commentRating.ratingRoomShowItem`
+- `raw_payload.commentRating.ratingServiceShowItem`
+- `raw_payload.commentRating.ratingFacilityShowItem`
+- `raw_payload.commentRating.ratingLocationShowItem`
+
+### Khuyen nghi chung
+
+- Neu crawler da co category score ro rang, uu tien gui `categories[]`
+- Neu giu nguyen payload goc de debug, bat buoc giu dung `raw_payload` theo format cua tung OTA
+- Khong gui category tags vao `categories[]` neu do chi la tag cam xuc, khong phai diem category
+
+## 9. Cach xu ly khi 1 hotel co nhieu link cung 1 OTA
 
 Day la rule quan trong nhat.
 
@@ -363,6 +501,12 @@ curl "https://data.datac.click/api/v1/reviews/stats?hotel_id=hotel-uuid-1&platfo
 
 ```bash
 curl "https://data.datac.click/api/v1/reviews?hotel_id=hotel-uuid-1&platform_code=booking&limit=20&offset=0"
+```
+
+### Check rieng review bad theo contract moi
+
+```bash
+curl "https://data.datac.click/api/v1/reviews?hotel_id=hotel-uuid-1&platform_code=booking&review_status=bad&limit=20&offset=0"
 ```
 
 ## 10. Endpoint xoa review theo OTA de lam sach du lieu

@@ -355,7 +355,6 @@ class ReviewAnalyticsRepository:
                 f"""
                 SELECT
                     m.bucket_code,
-                    MIN(m.bucket_label) AS bucket_label,
                     MIN(m.rating_from)::float8 AS rating_from,
                     MAX(m.rating_to)::float8 AS rating_to,
                     COALESCE(SUM(m.review_count), 0)::int AS review_count,
@@ -364,7 +363,7 @@ class ReviewAnalyticsRepository:
                 JOIN platforms p ON p.id = m.platform_id
                 WHERE {where_clause}
                 GROUP BY m.bucket_code
-                ORDER BY MIN(m.rating_from), m.bucket_code
+                ORDER BY MIN(COALESCE(m.rating_from, 99.0)), m.bucket_code
                 """
             ),
             params,

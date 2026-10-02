@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import db_session
 from app.schemas.access_admin import (
+    AuthLoginRequest,
+    AuthSessionResponse,
     PermissionResponse,
     RoleListResponse,
     RoleResponse,
@@ -14,6 +16,18 @@ from app.schemas.access_admin import (
 from app.services.access_admin_service import AccessAdminService
 
 router = APIRouter(prefix="/admin", tags=["admin-access"])
+
+
+@router.post("/auth/login", response_model=AuthSessionResponse)
+def login(
+    payload: AuthLoginRequest,
+    db: Session = Depends(db_session),
+) -> AuthSessionResponse:
+    service = AccessAdminService(db)
+    try:
+        return service.authenticate_user(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
 @router.get("/permissions", response_model=list[PermissionResponse])

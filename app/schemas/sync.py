@@ -12,7 +12,7 @@ class ExternalReviewPayload(BaseModel):
     source_updated_at: datetime | None = None
     review_url: str | None = None
     reviewer_name: str | None = None
-    reviewer_country_code: str = Field(min_length=2, max_length=2)
+    reviewer_country_code: str | None = Field(default=None, min_length=2, max_length=2)
     rating: float | None = None
     rating_scale: float | None = None
     review_title: str | None = None
@@ -29,7 +29,9 @@ class ExternalReviewPayload(BaseModel):
 
     @field_validator("reviewer_country_code")
     @classmethod
-    def normalize_reviewer_country_code(cls, value: str) -> str:
+    def normalize_reviewer_country_code(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         normalized = value.strip().upper()
         if len(normalized) != 2 or not normalized.isalpha():
             raise ValueError("reviewer_country_code must be a 2-letter ISO country code")

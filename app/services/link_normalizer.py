@@ -9,7 +9,7 @@ def normalize_source_link(platform_code: str, url: str) -> str:
     parts = urlsplit(cleaned)
     base = urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
 
-    if platform_code == "agoda":
+    if platform_code in {"agoda", "airbnb"}:
         return base
 
     return cleaned

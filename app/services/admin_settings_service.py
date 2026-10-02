@@ -1,4 +1,7 @@
 import os
+import json
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -10,6 +13,8 @@ from app.repositories.admin_settings_repository import (
     REVIEW_AI_DEFAULT_TIMEOUT_MS,
 )
 from app.schemas.admin_settings import (
+    AdminAiProviderValidationRequest,
+    AdminAiProviderValidationResponse,
     AdminSettingListResponse,
     AdminSettingResponse,
     AdminSettingUpdateRequest,
@@ -113,6 +118,72 @@ class AdminSettingsService:
             "timeout_ms": timeout_ms,
         }
 
+    def validate_ai_provider(
+        self,
+        payload: AdminAiProviderValidationRequest,
+    ) -> AdminAiProviderValidationResponse:
+        base_url = payload.base_url.strip()
+        api_key = payload.api_key.strip()
+        model = payload.model.strip()
+
+        if not base_url.startswith(("http://", "https://")):
+            raise ValueError("Base URL must start with http:// or https://")
+        if not api_key:
+            raise ValueError("API key is required")
+        if not model:
+            raise ValueError("Model is required")
+
+        request_payload = {
+            "model": model,
+            "temperature": 0,
+            "max_tokens": 5,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Reply with OK only.",
+                }
+            ],
+        }
+
+        body = json.dumps(request_payload).encode("utf-8")
+        request = Request(
+            url=f"{base_url.rstrip('/')}/chat/completions",
+            data=body,
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "JoyON-Admin-AI-Validation/1.0",
+                "Origin": "https://data.datac.click",
+                "Referer": "https://data.datac.click/",
+            },
+        )
+
+        try:
+            with urlopen(request, timeout=max(payload.timeout_ms / 1000, 1)) as response:
+                response_payload = json.loads(response.read().decode("utf-8"))
+        except HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise ValueError(f"AI validation failed with HTTP {exc.code}: {detail}") from exc
+        except URLError as exc:
+            raise ValueError(f"AI validation connection failed: {exc.reason}") from exc
+
+        content = (
+            response_payload.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content", "")
+            .strip()
+        )
+
+        if not content:
+            raise ValueError("AI validation failed: empty response from provider")
+
+        return AdminAiProviderValidationResponse(
+            ok=True,
+            message=f"Connection verified for {payload.name.strip()}.",
+        )
+
     def _serialize_setting(self, item: dict[str, object]) -> AdminSettingResponse:
         raw_value = str(item.get("value_text") or "")
         is_secret = bool(item.get("is_secret"))
@@ -138,6 +209,17 @@ class AdminSettingsService:
         if value is None:
             return None
 
+        if value_type == "boolean":
+            if isinstance(value, bool):
+                return "true" if value else "false"
+
+            normalized_bool = str(value).strip().lower()
+            if normalized_bool in {"true", "1", "yes", "on"}:
+                return "true"
+            if normalized_bool in {"false", "0", "no", "off"}:
+                return "false"
+            raise ValueError("setting value must be a boolean")
+
         if isinstance(value, bool):
             normalized = "true" if value else "false"
         else:
@@ -148,8 +230,18 @@ class AdminSettingsService:
                 int(normalized)
             except ValueError as exc:
                 raise ValueError("setting value must be an integer") from exc
+        elif value_type == "float":
+            try:
+                float(normalized)
+            except ValueError as exc:
+                raise ValueError("setting value must be a number") from exc
         elif value_type == "url" and normalized and not normalized.startswith(("http://", "https://")):
             raise ValueError("setting value must start with http:// or https://")
+        elif value_type == "json":
+            try:
+                json.loads(normalized)
+            except json.JSONDecodeError as exc:
+                raise ValueError("setting value must be valid JSON") from exc
 
         return normalized
 

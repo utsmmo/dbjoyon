@@ -10,10 +10,13 @@ from app.repositories.sync_job_repository import SyncJobRepository
 from app.schemas.sync import SyncReviewsRequest, SyncReviewsResponse
 from app.services.link_normalizer import normalize_source_link
 from app.services.platform_registry import get_review_mapper
+from app.services.review_rating_service import ReviewRatingService
 from app.services.translation_service import TranslationService
 
 
 class ReviewSyncService:
+    OPTIONAL_REVIEWER_COUNTRY_PLATFORMS = {"google", "airbnb"}
+
     def __init__(self, db: Session) -> None:
         self.db = db
         self.hotel_repository = HotelRepository(db)
@@ -24,6 +27,7 @@ class ReviewSyncService:
         self.review_category_repository = ReviewCategoryRepository(db)
         self.incident_repository = IncidentRepository(db)
         self.translation_service = TranslationService()
+        self.review_rating_service = ReviewRatingService(db)
 
     def sync_reviews(
         self,
@@ -35,6 +39,8 @@ class ReviewSyncService:
         if platform is None:
             raise ValueError(f"Platform not found or inactive: {platform_code}")
 
+        self._validate_review_payloads(platform_code=platform_code, payload=payload)
+
         hotel = self.hotel_repository.get_hotel_by_id(payload.hotel_id)
         if hotel is None:
             raise ValueError(f"Hotel not found: {payload.hotel_id}")
@@ -42,11 +48,13 @@ class ReviewSyncService:
         resolved_source_link = None
         resolved_hotel_platform_account = None
 
-        if payload.source_link_used:
-            resolved_source_link = normalize_source_link(
-                platform_code,
-                payload.source_link_used,
+        if not payload.source_link_used:
+            raise ValueError(
+                "source_link_used is required to prevent posting reviews into the wrong hotel"
             )
+
+        if payload.source_link_used:
+            resolved_source_link = normalize_source_link(platform_code, payload.source_link_used)
             source_links = (
                 hotel.get("metadata", {}).get("source_links", {}).get(platform_code, [])
             )
@@ -131,6 +139,7 @@ class ReviewSyncService:
         inserted = 0
         updated = 0
         incidents_opened = 0
+        rating_rules = self.review_rating_service.load_rules()
         stored_total_reviews_before_sync = self.review_repository.count_reviews(
             hotel_id=payload.hotel_id,
             platform_id=platform["id"],
@@ -181,6 +190,11 @@ class ReviewSyncService:
                     self.translation_service.enrich_review_translation(
                         normalized_review
                     )
+                )
+                rating = normalized_review.get("rating")
+                normalized_review["is_bad_review"] = rating_rules.is_bad(
+                    rating,
+                    fallback_is_bad=bool(normalized_review.get("is_bad_review")),
                 )
                 upserted = self.review_repository.upsert_review(
                     hotel_id=payload.hotel_id,
@@ -281,3 +295,24 @@ class ReviewSyncService:
             incidents_opened=incidents_opened,
             status="success",
         )
+
+    def _validate_review_payloads(
+        self,
+        *,
+        platform_code: str,
+        payload: SyncReviewsRequest,
+    ) -> None:
+        if platform_code in self.OPTIONAL_REVIEWER_COUNTRY_PLATFORMS:
+            return
+
+        missing_country_review_ids = [
+            item.external_review_id
+            for item in payload.reviews
+            if not item.reviewer_country_code
+        ]
+        if missing_country_review_ids:
+            raise ValueError(
+                "reviewer_country_code is required for this platform. "
+                f"Missing on {len(missing_country_review_ids)} review(s): "
+                + ", ".join(missing_country_review_ids[:5])
+            )

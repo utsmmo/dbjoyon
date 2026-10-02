@@ -142,6 +142,7 @@ Tài liệu này ghi rõ:
 
 - `D:\AutoCode\DB\Review\docs\ACCESS_CONTROL_ARCHITECTURE.md`
 - `D:\AutoCode\DB\Review\docs\WEBSITE_DB_HANDOFF.md`
+- `D:\AutoCode\DB\Review\docs\ADMIN_SETTINGS_ARCHITECTURE.md`
 
 ### Secondary
 
@@ -174,6 +175,10 @@ Tài liệu này ghi rõ:
 - `LEGACY_BOOKING_CLEANUP.md`
 - `MULTIAGENT_PLAYBOOK.md`
 - `TASK_HANDOFF_TEMPLATE.md`
+- `ChatbotAI/ADMIN_BOT_RAG_BUILD_PLAN.md`
+- `ChatbotAI/DB_SCHEMA_IMPLEMENTATION.md`
+- `ChatbotAI/API_CONTRACT_ADMIN_BOT_RAG.md`
+- `ChatbotAI/UI_CHECKLIST_ADMIN_BOT_RAG.md`
 
 ### Triage and ownership
 

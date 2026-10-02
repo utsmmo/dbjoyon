@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.repositories.access_admin_repository import AccessAdminRepository
 from app.schemas.access_admin import (
+    AuthLoginRequest,
+    AuthSessionResponse,
     PermissionResponse,
     RoleListResponse,
     RoleResponse,
@@ -22,6 +24,25 @@ class AccessAdminService:
         self.repository.ensure_access_baseline()
         self.db.commit()
         return [PermissionResponse(**item) for item in self.repository.list_permissions()]
+
+    def authenticate_user(self, payload: AuthLoginRequest) -> AuthSessionResponse:
+        try:
+            self.repository.ensure_access_baseline()
+            self.db.commit()
+            user = self.repository.authenticate_user(
+                email=payload.email,
+                password=payload.password,
+            )
+            if user is None:
+                raise ValueError("invalid email or password")
+            permission_codes = self.repository.get_user_permission_codes(user_id=user["id"])
+            return AuthSessionResponse(
+                user=UserResponse(**user),
+                permission_codes=permission_codes,
+            )
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise ValueError("database error while authenticating user") from exc
 
     def list_roles(self) -> RoleListResponse:
         self.repository.ensure_access_baseline()

@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import db_session
 from app.schemas.admin_settings import (
+    AdminAiProviderValidationRequest,
+    AdminAiProviderValidationResponse,
     AdminSettingListResponse,
     AdminSettingResponse,
     AdminSettingUpdateRequest,
@@ -33,3 +35,15 @@ def update_setting(
     except ValueError as exc:
         status_code = 404 if "not found" in str(exc).lower() else 400
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+
+@router.post("/ai/validate", response_model=AdminAiProviderValidationResponse)
+def validate_ai_provider(
+    payload: AdminAiProviderValidationRequest,
+    db: Session = Depends(db_session),
+) -> AdminAiProviderValidationResponse:
+    service = AdminSettingsService(db)
+    try:
+        return service.validate_ai_provider(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

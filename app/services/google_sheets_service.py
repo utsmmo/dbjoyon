@@ -16,6 +16,7 @@ from app.schemas.google_sheets import (
     GoogleSheetsExportRequest,
     GoogleSheetsExportResponse,
 )
+from app.services.review_rating_service import ReviewRatingService
 from app.services.translation_service import TranslationService
 
 
@@ -47,6 +48,7 @@ class GoogleSheetsService:
         self.hotel_repository = HotelRepository(db)
         self.review_repository = ReviewRepository(db)
         self.translation_service = TranslationService()
+        self.review_rating_service = ReviewRatingService(db)
 
     def export_reviews(self, payload: GoogleSheetsExportRequest) -> GoogleSheetsExportResponse:
         spreadsheet_id = payload.spreadsheet_id or settings.google_sheets_spreadsheet_id
@@ -250,8 +252,12 @@ class GoogleSheetsService:
 
     def _hydrate_missing_translations(self, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         changed = False
+        rating_rules = self.review_rating_service.load_rules()
         for row in rows:
-            corrected_bad_flag = self._compute_bad_review(row)
+            corrected_bad_flag = rating_rules.is_bad(
+                row.get("rating"),
+                fallback_is_bad=bool(row.get("is_bad_review")),
+            )
             if row.get("is_bad_review") != corrected_bad_flag:
                 row["is_bad_review"] = corrected_bad_flag
                 self.review_repository.update_review_bad_flag(
@@ -303,13 +309,6 @@ class GoogleSheetsService:
             except Exception:
                 self.db.rollback()
         return rows
-
-    @staticmethod
-    def _compute_bad_review(row: dict[str, Any]) -> bool:
-        rating = row.get("rating")
-        if rating is None:
-            return bool(row.get("is_bad_review"))
-        return float(rating) < settings.bad_review_rating_threshold
 
     @staticmethod
     def _has_translation(row: dict[str, Any]) -> bool:

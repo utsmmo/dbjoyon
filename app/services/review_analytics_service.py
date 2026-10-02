@@ -10,11 +10,13 @@ from app.schemas.review_analytics import (
     ReviewScoreBucketsResponse,
     ReviewSummaryAggregateResponse,
 )
+from app.services.review_rating_service import ReviewRatingService
 
 
 class ReviewAnalyticsService:
     def __init__(self, db: Session) -> None:
         self.repository = ReviewAnalyticsRepository(db)
+        self.review_rating_service = ReviewRatingService(db)
 
     def get_summary(
         self,
@@ -146,6 +148,7 @@ class ReviewAnalyticsService:
             date_from=date_from_value,
             date_to=date_to_value,
         )
+        items = self._collapse_score_buckets(items)
         return ReviewScoreBucketsResponse(items=items, total=len(items))
 
     def get_daily_trend(
@@ -186,3 +189,70 @@ class ReviewAnalyticsService:
         if date_from is None or date_to is None:
             raise ValueError("date_from and date_to are required in phase 1")
         cls._validate_date_range(date_from, date_to)
+
+    def _collapse_score_buckets(self, raw_items: list[dict]) -> list[dict]:
+        rating_rules = self.review_rating_service.load_rules()
+        collapsed = {
+            "good": {
+                "bucket_code": "good",
+                "bucket_label": "Good",
+                "rating_from": rating_rules.good_min,
+                "rating_to": 10.0,
+                "review_count": 0,
+                "bad_review_count": 0,
+            },
+            "average": {
+                "bucket_code": "average",
+                "bucket_label": "Average",
+                "rating_from": rating_rules.average_min,
+                "rating_to": rating_rules.good_min,
+                "review_count": 0,
+                "bad_review_count": 0,
+            },
+            "bad": {
+                "bucket_code": "bad",
+                "bucket_label": "Bad",
+                "rating_from": 0.0,
+                "rating_to": rating_rules.average_min,
+                "review_count": 0,
+                "bad_review_count": 0,
+            },
+            "unrated": {
+                "bucket_code": "unrated",
+                "bucket_label": "Unrated",
+                "rating_from": 0.0,
+                "rating_to": 0.0,
+                "review_count": 0,
+                "bad_review_count": 0,
+            },
+        }
+
+        for item in raw_items:
+            bucket_code = str(item.get("bucket_code") or "").strip().lower()
+            if bucket_code == "unrated":
+                bucket_key = "unrated"
+            else:
+                probe_rating = item.get("rating_from")
+                if probe_rating is None:
+                    probe_rating = item.get("rating_to")
+                bucket_key = rating_rules.classify(
+                    float(probe_rating) if probe_rating is not None else None,
+                    fallback_is_bad=bucket_code == "bad",
+                )
+
+            target = collapsed.setdefault(
+                bucket_key,
+                {
+                    "bucket_code": bucket_key,
+                    "bucket_label": bucket_key.title(),
+                    "rating_from": 0.0,
+                    "rating_to": 0.0,
+                    "review_count": 0,
+                    "bad_review_count": 0,
+                },
+            )
+            target["review_count"] += int(item.get("review_count") or 0)
+            target["bad_review_count"] += int(item.get("bad_review_count") or 0)
+
+        ordered_keys = ("good", "average", "bad", "unrated")
+        return [collapsed[key] for key in ordered_keys if collapsed.get(key)]
